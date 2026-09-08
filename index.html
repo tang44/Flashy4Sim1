@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Chinese Vocabulary Study</title>
+
+  <meta
+    name="description"
+    content="Chinese vocabulary flashcards, reading practice, games, and progress tracking."
+  />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <div id="app">
+
+    <!-- ============================= -->
+    <!-- HEADER -->
+    <!-- ============================= -->
+
+    <header class="app-header">
+
+      <div class="brand">
+        <div class="brand-chinese">中文</div>
+
+        <div>
+          <h1>Chinese Study</h1>
+          <p>Vocabulary • Reading • Games</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <span id="word-count">Loading vocabulary...</span>
+      </div>
+
+    </header>
+
+
+    <!-- ============================= -->
+    <!-- NAVIGATION -->
+    <!-- ============================= -->
+
+    <nav class="main-nav">
+
+      <button
+        class="nav-button active"
+        data-view="home"
+      >
+        🏠 Home
+      </button>
+
+      <button
+        class="nav-button"
+        data-view="flashcards"
+      >
+        🃏 Flashcards
+      </button>
+
+      <button
+        class="nav-button"
+        data-view="reading"
+      >
+        📖 Reading
+      </button>
+
+      <button
+        class="nav-button"
+        data-view="games"
+      >
+        🎮 Games
+      </button>
+
+      <button
+        class="nav-button"
+        data-view="progress"
+      >
+        📊 Progress
+      </button>
+
+    </nav>
+
+
+    <!-- ============================= -->
+    <!-- MAIN CONTENT -->
+    <!-- ============================= -->
+
+    <main class="main-container">
+
+
+      <!-- ========================================= -->
+      <!-- LOADING / ERROR -->
+      <!-- ========================================= -->
+
+      <div
+        id="loading-message"
+        class="message-panel"
+      >
+        <div class="loading-spinner"></div>
+
+        <h2>Loading vocabulary...</h2>
+
+        <p>
+          Please wait while the Excel vocabulary file is loaded.
+        </p>
+      </div>
+
+
+      <div
+        id="error-message"
+        class="message-panel error hidden"
+      >
+        <h2>Could not load vocabulary</h2>
+
+        <p id="error-text">
+          There was a problem loading the Excel file.
+        </p>
+
+        <button
+          id="reload-button"
+          class="primary-button"
+        >
+          Try Again
+        </button>
+      </div>
+
+
+      <!-- ========================================= -->
+      <!-- HOME -->
+      <!-- ========================================= -->
+
+      <section
+        id="view-home"
+        class="view active-view"
+      >
+
+        <div class="hero">
+
+          <div class="hero-text">
+
+            <span class="eyebrow">
+              中文学习
+            </span>
+
+            <h2>
+              Learn Chinese vocabulary
+              <span>one word at a time.</span>
+            </h2>
+
+            <p>
+              Study vocabulary, practice reading sentences,
+              play games, and track your progress.
+            </p>
+
+            <button
+              id="home-start-button"
+              class="primary-button large-button"
+            >
+              Start Studying
+            </button>
+
+          </div>
+
+          <div class="hero-character">
+            学
+          </div>
+
+        </div>
+
+
+        <!-- Home statistics -->
+
+        <div class="stats-grid">
+
+          <div class="stat-card">
+            <span class="stat-icon">📚</span>
+            <strong id="home-total-words">0</strong>
+            <span>Total Words</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">⭐</span>
+            <strong id="home-mastered">0</strong>
+            <span>Mastered</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">🔄</span>
+            <strong id="home-review">0</strong>
+            <span>Need Review</span>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">🎯</span>
+            <strong id="home-accuracy">0%</strong>
+            <span>Accuracy</span>
+          </div>
+
+        </div>
+
+
+        <!-- Quick actions -->
+
+        <div class="section-heading">
+          <h3>Quick Study</h3>
+        </div>
+
+        <div class="quick-actions">
+
+          <button
+            class="action-card"
+            data-go-view="flashcards"
+          >
+            <span>🃏</span>
+            <strong>Flashcards</strong>
+            <small>Review vocabulary</small>
+          </button>
+
+          <button
+            class="action-card"
+            data-go-view="reading"
+          >
+            <span>📖</span>
+            <strong>Reading</strong>
+            <small>Practice example sentences</small>
+          </button>
+
+          <button
+            class="action-card"
+            data-go-view="games"
+          >
+            <span>🎮</span>
+            <strong>Games</strong>
+            <small>Practice while playing</small>
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <!-- ========================================= -->
+      <!-- FLASHCARDS -->
+      <!-- ========================================= -->
+
+      <section
+        id="view-flashcards"
+        class="view"
+      >
+
+        <div class="page-heading">
+
+          <div>
+            <span class="eyebrow">VOCABULARY</span>
+
+            <h2>Flashcards</h2>
+
+            <p>
+              Build a study set and review your vocabulary.
+            </p>
+          </div>
+
+          <button
+            id="flashcard-speak"
+            class="icon-button"
+            title="Pronounce word"
+          >
+            🔊
+          </button>
+
+        </div>
+
+
+        <!-- Filters -->
+
+        <div class="filter-panel">
+
+          <div class="filter-group">
+
+            <label for="lesson-filter">
+              Lesson
+            </label>
+
+            <select id="lesson-filter">
+              <option value="">All Lessons</option>
+            </select>
+
+          </div>
+
+
+          <div class="filter-group">
+
+            <label for="topic-filter">
+              Topic
+            </label>
+
+            <select id="topic-filter">
+              <option value="">All Topics</option>
+            </select>
+
+          </div>
+
+
+          <div class="filter-group">
+
+            <label for="hsk-filter">
+              HSK Level
+            </label>
+
+            <select id="hsk-filter">
+              <option value="">All HSK Levels</option>
+            </select>
+
+          </div>
+
+
+          <div class="filter-group">
+
+            <label for="study-size">
+              Study Set
+            </label>
+
+            <select id="study-size">
+              <option value="20">20 words</option>
+              <option value="50">50 words</option>
+              <option value="100">100 words</option>
+            </select>
+
+          </div>
+
+
+          <button
+            id="create-study-set"
+            class="primary-button"
+          >
+            Create Study Set
+          </button>
+
+        </div>
+
+
+        <!-- Flashcard -->
+
+        <div class="flashcard-area">
+
+          <div
+            id="flashcard"
+            class="flashcard"
+          >
+
+            <div class="flashcard-inner">
+
+              <!-- FRONT -->
+
+              <div class="flashcard-face flashcard-front">
+
+                <span class="card-label">
+                  Chinese
+                </span>
+
+                <div
+                  id="flashcard-simplified"
+                  class="main-chinese"
+                >
+                  —
+                </div>
+
+                <div
+                  id="flashcard-progress"
+                  class="card-progress"
+                >
+                  0 / 0
+                </div>
+
+                <div class="flip-hint">
+                  Click the card to reveal
+                </div>
+
+              </div>
+
+
+              <!-- BACK -->
+
+              <div class="flashcard-face flashcard-back">
+
+                <div class="back-header">
+
+                  <span class="card-label">
+                    Vocabulary
+                  </span>
+
+                  <button
+                    id="back-speak"
+                    class="small-icon-button"
+                    title="Pronounce"
+                  >
+                    🔊
+                  </button>
+
+                </div>
+
+                <div
+                  id="flashcard-details"
+                  class="flashcard-details"
+                >
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <!-- Flashcard controls -->
+
+          <div class="flashcard-controls">
+
+            <button
+              id="previous-card"
+              class="secondary-button"
+            >
+              ← Previous
+            </button>
+
+            <button
+              id="shuffle-card"
+              class="secondary-button"
+            >
+              🔀 Shuffle
+            </button>
+
+            <button
+              id="next-card"
+              class="primary-button"
+            >
+              Next →
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- ========================================= -->
+      <!-- READING -->
+      <!-- ========================================= -->
+
+      <section
+        id="view-reading"
+        class="view"
+      >
+
+        <div class="page-heading">
+
+          <div>
+            <span class="eyebrow">阅读</span>
+
+            <h2>Reading Practice</h2>
+
+            <p>
+              Hover over characters for vocabulary information.
+              Click a character to see more details.
+            </p>
+          </div>
+
+        </div>
+
+
+        <div class="reading-layout">
+
+
+          <!-- Reading card -->
+
+          <div class="reading-card">
+
+            <div class="reading-card-header">
+
+              <span id="reading-example-label">
+                Example 1
+              </span>
+
+              <button
+                id="reading-speak"
+                class="icon-button"
+                title="Pronounce sentence"
+              >
+                🔊
+              </button>
+
+            </div>
+
+
+            <div
+              id="reading-sentence"
+              class="reading-sentence"
+            >
+              Loading...
+            </div>
+
+
+            <button
+              id="show-example-details"
+              class="secondary-button"
+            >
+              Show Pinyin &amp; English
+            </button>
+
+
+            <div
+              id="example-details"
+              class="example-details hidden"
+            >
+
+              <div class="example-pinyin">
+                <strong>Pinyin</strong>
+                <p id="example-pinyin-text"></p>
+              </div>
+
+              <div class="example-english">
+                <strong>English</strong>
+                <p id="example-english-text"></p>
+              </div>
+
+            </div>
+
+
+            <div class="reading-navigation">
+
+              <button
+                id="previous-reading"
+                class="secondary-button"
+              >
+                ← Previous
+              </button>
+
+              <button
+                id="random-reading"
+                class="secondary-button"
+              >
+                🔀 Random
+              </button>
+
+              <button
+                id="next-reading"
+                class="primary-button"
+              >
+                Next →
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- Character information -->
+
+          <aside
+            id="character-details"
+            class="character-details-panel"
+          >
+
+            <div class="character-placeholder">
+
+              <div class="large-placeholder-character">
+                字
+              </div>
+
+              <h3>Character Information</h3>
+
+              <p>
+                Hover over or click a Chinese character
+                in the sentence.
+              </p>
+
+            </div>
+
+          </aside>
+
+        </div>
+
+      </section>
+
+
+      <!-- ========================================= -->
+      <!-- GAMES -->
+      <!-- ========================================= -->
+
+      <section
+        id="view-games"
+        class="view"
+      >
+
+        <div class="page-heading">
+
+          <div>
+            <span class="eyebrow">练习</span>
+
+            <h2>Mini-Games</h2>
+
+            <p>
+              Practice vocabulary in different ways.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <!-- Game selection -->
+
+        <div
+          id="game-selection"
+          class="game-selection"
+        >
+
+          <button
+            class="game-card"
+            data-game="multiple-choice"
+          >
+            <span class="game-icon">🎯</span>
+
+            <strong>Multiple Choice</strong>
+
+            <small>
+              Chinese → English
+            </small>
+          </button>
+
+
+          <button
+            class="game-card"
+            data-game="english-chinese"
+          >
+            <span class="game-icon">🔄</span>
+
+            <strong>English → Chinese</strong>
+
+            <small>
+              Choose the correct Chinese word
+            </small>
+          </button>
+
+
+          <button
+            class="game-card"
+            data-game="scramble"
+          >
+            <span class="game-icon">🧩</span>
+
+            <strong>Word Builder</strong>
+
+            <small>
+              Unscramble the Chinese word
+            </small>
+          </button>
+
+
+          <button
+            class="game-card"
+            data-game="matching"
+          >
+            <span class="game-icon">🃏</span>
+
+            <strong>Matching</strong>
+
+            <small>
+              Match Chinese and English
+            </small>
+          </button>
+
+
+          <button
+            class="game-card"
+            data-game="sentence"
+          >
+            <span class="game-icon">📖</span>
+
+            <strong>Sentence Scramble</strong>
+
+            <small>
+              Put a sentence in order
+            </small>
+          </button>
+
+
+          <button
+            class="game-card"
+            data-game="listening"
+          >
+            <span class="game-icon">🔊</span>
+
+            <strong>Listening</strong>
+
+            <small>
+              Listen and choose
+            </small>
+          </button>
+
+        </div>
+
+
+        <!-- Game area -->
+
+        <div
+          id="game-area"
+          class="game-area hidden"
+        >
+
+          <div class="game-header">
+
+            <button
+              id="exit-game"
+              class="secondary-button"
+            >
+              ← Games
+            </button>
+
+            <div class="game-score">
+              Score:
+              <strong id="game-score">0</strong>
+            </div>
+
+          </div>
+
+
+          <div
+            id="game-content"
+            class="game-content"
+          >
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- ========================================= -->
+      <!-- PROGRESS -->
+      <!-- ========================================= -->
+
+      <section
+        id="view-progress"
+        class="view"
+      >
+
+        <div class="page-heading">
+
+          <div>
+            <span class="eyebrow">进步</span>
+
+            <h2>Your Progress</h2>
+
+            <p>
+              Track your vocabulary practice.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="progress-summary">
+
+          <div class="progress-stat">
+            <strong id="progress-total">0</strong>
+            <span>Words Practiced</span>
+          </div>
+
+          <div class="progress-stat">
+            <strong id="progress-mastered">0</strong>
+            <span>Mastered</span>
+          </div>
+
+          <div class="progress-stat">
+            <strong id="progress-review">0</strong>
+            <span>Needs Review</span>
+          </div>
+
+          <div class="progress-stat">
+            <strong id="progress-accuracy">0%</strong>
+            <span>Accuracy</span>
+          </div>
+
+        </div>
+
+
+        <div class="progress-actions">
+
+          <button
+            id="review-incorrect"
+            class="primary-button"
+          >
+            Review Incorrect Words
+          </button>
+
+          <button
+            id="reset-progress"
+            class="danger-button"
+          >
+            Reset Progress
+          </button>
+
+        </div>
+
+
+        <div class="section-heading">
+          <h3>Vocabulary Progress</h3>
+        </div>
+
+
+        <div
+          id="progress-list"
+          class="progress-list"
+        >
+        </div>
+
+      </section>
+
+    </main>
+
+
+    <!-- ========================================= -->
+    <!-- FOOTER -->
+    <!-- ========================================= -->
+
+    <footer class="app-footer">
+
+      <span>
+        Chinese Study App — Version 1
+      </span>
+
+      <span>
+        Vocabulary powered by your Excel dataset
+      </span>
+
+    </footer>
+
+  </div>
+
+
+  <!-- ========================================= -->
+  <!-- JAVASCRIPT -->
+  <!-- ========================================= -->
+
+  <!-- SheetJS: read Excel files directly in the browser -->
+  <script
+    src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+  ></script>
+
+  <!-- Main application -->
+  <script src="app.js"></script>
+
+  <noscript>
+    <div class="message-panel error">
+      <h2>JavaScript is required</h2>
+      <p>
+        Please enable JavaScript in your browser to use the
+        Chinese Study application.
+      </p>
+    </div>
+  </noscript>
+
+</body>
+</html>

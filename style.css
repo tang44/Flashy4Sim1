@@ -689,6 +689,7 @@ button:disabled {
   justify-content: flex-start;
 
   overflow-y: auto;
+  white-space: nowrap;
 }
 
 .card-label {
@@ -1745,4 +1746,140 @@ button:disabled {
 
     gap: 5px;
   }
+}
+
+/* ============================================================
+   FLASHCARD DETAIL FORMATTING
+============================================================ */
+
+/* Simplified + Traditional + Lesson/Topic on one line */
+.detail-word-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 0.5rem;
+}
+
+/* Simplified / Traditional groups */
+.detail-word-group {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.detail-word-label {
+  font-weight: 600;
+  margin-right: 4px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+/* Chinese words */
+.detail-word-simplified,
+.detail-word-traditional {
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.detail-word-simplified {
+  color: white;
+}
+
+.detail-word-traditional {
+  opacity: 0.8;
+}
+
+
+/* Lesson + Topic */
+.detail-lesson-group {
+  display: inline-flex;
+  align-items: baseline;
+
+  margin-left: 4px;
+
+  color: #fbbf24;
+
+  font-family:
+    "Trebuchet MS",
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 1rem;
+
+  font-weight: 600;
+
+  letter-spacing: 0.01em;
+
+  white-space: nowrap;
+}
+
+
+/* HSK + CLI reference information */
+.detail-reference {
+  font-style: italic;
+  color: #b8b8b8;
+}
+
+/* Divider before HSK information */
+.detail-reference:first-child {
+  border-top: 3px solid rgba(255, 255, 255, 0.45);
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+
+/* Example sentence */
+.example-chinese {
+  font-size: 1.4rem;
+
+  font-weight: 600;
+
+  margin-bottom: 0.35rem;
+
+  line-height: 1.5;
+}
+
+.example-pinyin {
+  font-style: italic;
+
+  margin-bottom: 0.35rem;
+
+  line-height: 1.5;
+}
+
+.example-english {
+  line-height: 1.4;
+}
+
+/* Normal detail rows */
+.detail-row {
+  padding: 6px 0;
+}
+
+/* HSK and CLI */
+.detail-reference {
+  font-style: italic;
+  color: #b8b8b8;
+}
+
+/* Divider immediately before HSK */
+.detail-reference:first-child {
+  border-top: 3px solid rgba(255, 255, 255, 0.45);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.main-chinese {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+}
+
+.main-chinese .traditional-note {
+  font-size: 0.38em;
+  margin-top: 12px;
+  opacity: 0.7;
+  line-height: 1.2;
 }

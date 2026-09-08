@@ -1,5 +1,6 @@
 /* ============================================================
    CHINESE STUDY APP
+   Matched to current index.html
    Plain HTML / CSS / JavaScript
    No Vite / npm required
 ============================================================ */
@@ -10,56 +11,37 @@
 ============================================================ */
 
 const EXCEL_FILE = "WM_level1_all_with_HSK.xlsx";
-// const EXCEL_FILE = "data/WM_level1_all_with_HSK.xlsx";
-
-//WM_level1_all_with_HSK.xlsx
-
-const STORAGE_KEY = "chineseStudyProgress_v1";
 
 
 /* ============================================================
-   APPLICATION STATE
+   APP STATE
 ============================================================ */
 
 const state = {
 
-  // Original Excel data
   vocabulary: [],
-
-  // Data after filters
   filteredVocabulary: [],
 
-  // Current study set
   studySet: [],
-
-  // Flashcard position
   cardIndex: 0,
-
-  // Flashcard flipped?
   cardFlipped: false,
 
-  // Reading
-  readingVocabulary: [],
-  readingIndex: 0,
+  flashcardExample: null,
 
-  // Currently displayed example
   readingExampleNumber: 1,
+  readingIndex: 0,
+  currentReadingRow: null,
+  currentReadingExample: null,
 
-  // Progress
   progress: {},
 
-  // Games
-  currentGame: null,
   gameWords: [],
-  gameIndex: 0,
+  currentGame: null,
+  currentGameIndex: 0,
   gameScore: 0,
-  gameAnswered: false,
 
-  // Matching
-  matchingCards: [],
-  matchingFirst: null,
-  matchingSecond: null,
-  matchingMatches: 0
+  matchingMatches: 0,
+  matchingSelected: null
 
 };
 
@@ -68,144 +50,352 @@ const state = {
    DOM HELPERS
 ============================================================ */
 
-const $ = (selector) =>
-  document.querySelector(selector);
+function $(selector) {
+  return document.querySelector(selector);
+}
 
-const $$ = (selector) =>
-  Array.from(document.querySelectorAll(selector));
+function $$(selector) {
+  return Array.from(document.querySelectorAll(selector));
+}
 
 
 /* ============================================================
-   NORMALIZATION
+   GENERAL HELPERS
 ============================================================ */
 
 function clean(value) {
 
   if (
-    value === undefined ||
-    value === null
+    value === null ||
+    value === undefined
   ) {
     return "";
   }
 
   return String(value).trim();
+
 }
 
 
-function getWord(row) {
-  return clean(row.Simplified);
+function escapeHTML(value) {
+
+  return clean(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
 }
 
 
-function getEnglish(row) {
-  return clean(row.English);
+function escapeAttribute(value) {
+  return escapeHTML(value);
 }
 
-
-/* ============================================================
-   SHUFFLE
-============================================================ */
 
 function shuffle(array) {
 
-  const copy = [...array];
+  const result = [...array];
 
   for (
-    let i = copy.length - 1;
+    let i = result.length - 1;
     i > 0;
     i--
   ) {
 
     const j =
-      Math.floor(Math.random() * (i + 1));
+      Math.floor(
+        Math.random() * (i + 1)
+      );
 
     [
-      copy[i],
-      copy[j]
+      result[i],
+      result[j]
     ] = [
-      copy[j],
-      copy[i]
+      result[j],
+      result[i]
     ];
 
   }
 
-  return copy;
+  return result;
+
 }
 
 
 /* ============================================================
-   LOAD EXCEL
+   EXCEL HELPERS
+============================================================ */
+
+function getRowValue(row, possibleNames) {
+
+  for (const name of possibleNames) {
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        row,
+        name
+      )
+    ) {
+
+      const value = clean(row[name]);
+
+      if (value) {
+        return value;
+      }
+
+    }
+
+  }
+
+  return "";
+
+}
+
+
+function getLesson(row) {
+
+  return getRowValue(
+    row,
+    [
+      "Lesson#",
+      "Lesson",
+      "Lesson #",
+      "Lesson_Number",
+      "Lesson Number"
+    ]
+  );
+
+}
+
+
+function getTopic(row) {
+
+  return getRowValue(
+    row,
+    [
+      "Topic",
+      "Lesson Topic"
+    ]
+  );
+
+}
+
+
+function getHSKNumber(row) {
+
+  return getRowValue(
+    row,
+    [
+      "HSK_Number",
+      "HSK Number",
+      "HSK#",
+      "HSK #"
+    ]
+  );
+
+}
+
+
+function getHSKLevel(row) {
+
+  return getRowValue(
+    row,
+    [
+      "HSK_Level",
+      "HSK Level"
+    ]
+  );
+
+}
+
+
+function getCLIEnglish(row) {
+
+  return getRowValue(
+    row,
+    [
+      "CLI_English",
+      "CLI English"
+    ]
+  );
+
+}
+
+
+/* ============================================================
+   EXAMPLE SENTENCES
+============================================================ */
+
+/* ============================================================
+   EXAMPLE SENTENCES
+============================================================ */
+
+function getAvailableExamples(row) {
+
+  const examples = [];
+
+  /*
+    Normalize column names so these all match:
+
+    Example_1_Chinese
+    Example 1 Chinese
+    Example1_Chinese
+    Example1 Chinese
+    Example1Chinese
+  */
+
+  const normalizeKey = value =>
+    clean(value)
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "");
+
+  const rowKeys = Object.keys(row);
+
+  function findExampleColumn(number, type) {
+
+    const target =
+      normalizeKey(
+        `Example${number}${type}`
+      );
+
+    return rowKeys.find(
+      key =>
+        normalizeKey(key) === target
+    );
+
+  }
+
+  for (let i = 1; i <= 3; i++) {
+
+    const chineseColumn =
+      findExampleColumn(
+        i,
+        "Chinese"
+      );
+
+    const pinyinColumn =
+      findExampleColumn(
+        i,
+        "Pinyin"
+      );
+
+    const englishColumn =
+      findExampleColumn(
+        i,
+        "English"
+      );
+
+
+    const chinese =
+      chineseColumn
+        ? clean(row[chineseColumn])
+        : "";
+
+    const pinyin =
+      pinyinColumn
+        ? clean(row[pinyinColumn])
+        : "";
+
+    const english =
+      englishColumn
+        ? clean(row[englishColumn])
+        : "";
+
+
+    if (
+      chinese ||
+      pinyin ||
+      english
+    ) {
+
+      examples.push({
+
+        number: i,
+
+        chinese,
+
+        pinyin,
+
+        english
+
+      });
+
+    }
+
+  }
+
+  return examples;
+
+}
+
+
+/* ============================================================
+   LOADING
 ============================================================ */
 
 async function loadVocabulary() {
 
+  showLoading();
+
   try {
 
-    showLoading();
-
-
-    /* Make sure SheetJS loaded before trying to use it. */
-
-    if (typeof XLSX === "undefined") {
+    if (
+      typeof XLSX === "undefined"
+    ) {
 
       throw new Error(
-        "The Excel reader could not be loaded. " +
-        "Please check your internet connection and reload the page."
+        "SheetJS could not be loaded. Check the SheetJS script in index.html and make sure you are connected to the internet."
       );
 
     }
-
 
     console.log(
       "Loading vocabulary from:",
       EXCEL_FILE
     );
 
-
     const response =
       await fetch(EXCEL_FILE);
-
 
     if (!response.ok) {
 
       throw new Error(
-        `Excel file could not be found. HTTP ${response.status}. ` +
-        `Expected file at: ${EXCEL_FILE}`
+        `Could not load ${EXCEL_FILE}. HTTP ${response.status}`
       );
 
     }
 
-
-    const arrayBuffer =
+    const buffer =
       await response.arrayBuffer();
 
+    console.log(
+      "Excel file downloaded successfully."
+    );
 
     const workbook =
       XLSX.read(
-        arrayBuffer,
+        buffer,
         {
           type: "array"
         }
       );
 
-
     if (
-      !workbook.SheetNames ||
       !workbook.SheetNames.length
     ) {
 
       throw new Error(
-        "The Excel workbook contains no worksheets."
+        "The Excel workbook does not contain any worksheets."
       );
 
     }
-
 
     const firstSheet =
       workbook.Sheets[
         workbook.SheetNames[0]
       ];
-
 
     const rows =
       XLSX.utils.sheet_to_json(
@@ -215,41 +405,59 @@ async function loadVocabulary() {
         }
       );
 
-
-    if (!rows.length) {
-
-      throw new Error(
-        "The Excel sheet contains no vocabulary rows."
-      );
-
-    }
-
+    console.log(
+      "Excel rows found:",
+      rows.length
+    );
 
     state.vocabulary =
       rows.filter(
-        row => getWord(row)
+        row =>
+          clean(row.Simplified)
       );
 
+    console.log(
+      "Loaded vocabulary:",
+      state.vocabulary.length
+    );
 
-    if (!state.vocabulary.length) {
+    if (
+      !state.vocabulary.length
+    ) {
 
       throw new Error(
-        "The Excel file was loaded, but no rows containing Simplified Chinese words were found."
+        "No vocabulary rows containing a Simplified word were found. Check the Excel column name."
       );
 
     }
 
+    const firstRow =
+      state.vocabulary[0];
 
-    validateColumns();
+    const simplifiedColumn =
+      Object.prototype.hasOwnProperty.call(
+        firstRow,
+        "Simplified"
+      );
 
-    console.log(
-      `Loaded ${state.vocabulary.length} vocabulary words.`
-    );
+    const englishColumn =
+      Object.prototype.hasOwnProperty.call(
+        firstRow,
+        "English"
+      );
 
+    if (
+      !simplifiedColumn ||
+      !englishColumn
+    ) {
+
+      throw new Error(
+        "The Excel file must contain at least the columns 'Simplified' and 'English'."
+      );
+
+    }
 
     initializeApp();
-
-    hideLoading();
 
   } catch (error) {
 
@@ -259,8 +467,7 @@ async function loadVocabulary() {
     );
 
     showError(
-      error.message ||
-      "Unknown error loading vocabulary."
+      error.message
     );
 
   }
@@ -269,68 +476,23 @@ async function loadVocabulary() {
 
 
 /* ============================================================
-   VALIDATE DATA
-============================================================ */
-
-function validateColumns() {
-
-  if (!state.vocabulary.length) {
-
-    throw new Error(
-      "No vocabulary rows were found."
-    );
-
-  }
-
-
-  const firstRow =
-    state.vocabulary[0];
-
-
-  const requiredColumns = [
-    "Simplified",
-    "English"
-  ];
-
-
-  const missing =
-    requiredColumns.filter(
-      column =>
-        !(column in firstRow)
-    );
-
-
-  if (missing.length) {
-
-    throw new Error(
-      `Missing required Excel columns: ${missing.join(", ")}`
-    );
-
-  }
-
-}
-
-
-/* ============================================================
-   APP INITIALIZATION
+   INITIALIZE APP
 ============================================================ */
 
 function initializeApp() {
 
+  console.log(
+    "Initializing Chinese Study App..."
+  );
+
   loadProgress();
-
-  populateFilters();
-
 
   state.filteredVocabulary =
     [...state.vocabulary];
 
+  populateFilters();
 
   createDefaultStudySet();
-
-  initializeReading();
-
-  updateAllStatistics();
 
   setupNavigation();
 
@@ -342,13 +504,29 @@ function initializeApp() {
 
   setupProgress();
 
+  setupHomeButtons();
+
+  updateStats();
+
   updateWordCount();
+
+  renderFlashcard();
+
+  renderReading();
+
+  updateProgressDisplay();
+
+  hideLoading();
+
+  console.log(
+    "Chinese Study App initialized successfully."
+  );
 
 }
 
 
 /* ============================================================
-   LOADING UI
+   LOADING / ERROR UI
 ============================================================ */
 
 function showLoading() {
@@ -356,17 +534,29 @@ function showLoading() {
   const loading =
     $("#loading-message");
 
+  if (loading) {
+
+    loading.classList.remove(
+      "hidden"
+    );
+
+    loading.style.display =
+      "block";
+
+  }
+
   const error =
     $("#error-message");
 
-
-  if (loading) {
-    loading.classList.remove("hidden");
-  }
-
-
   if (error) {
-    error.classList.add("hidden");
+
+    error.classList.add(
+      "hidden"
+    );
+
+    error.style.display =
+      "none";
+
   }
 
 }
@@ -377,17 +567,15 @@ function hideLoading() {
   const loading =
     $("#loading-message");
 
-  const error =
-    $("#error-message");
-
-
   if (loading) {
-    loading.classList.add("hidden");
-  }
 
+    loading.classList.add(
+      "hidden"
+    );
 
-  if (error) {
-    error.classList.add("hidden");
+    loading.style.display =
+      "none";
+
   }
 
 }
@@ -398,28 +586,38 @@ function showError(message) {
   const loading =
     $("#loading-message");
 
+  if (loading) {
+
+    loading.classList.add(
+      "hidden"
+    );
+
+    loading.style.display =
+      "none";
+
+  }
+
   const error =
     $("#error-message");
+
+  if (error) {
+
+    error.classList.remove(
+      "hidden"
+    );
+
+    error.style.display =
+      "block";
+
+  }
 
   const errorText =
     $("#error-text");
 
-
-  if (loading) {
-    loading.classList.add("hidden");
-  }
-
-
-  if (error) {
-    error.classList.remove("hidden");
-  }
-
-
   if (errorText) {
 
     errorText.textContent =
-      message ||
-      "Unknown error loading vocabulary.";
+      message;
 
   }
 
@@ -427,107 +625,22 @@ function showError(message) {
 
 
 /* ============================================================
-   NAVIGATION
+   ERROR RELOAD BUTTON
 ============================================================ */
 
-function setupNavigation() {
+function setupReloadButton() {
 
-  $$(".nav-button")
-    .forEach(button => {
+  const button =
+    $("#reload-button");
 
-      button.addEventListener(
-        "click",
-        () => {
+  if (button) {
 
-          const view =
-            button.dataset.view;
-
-          showView(view);
-
-        }
-      );
-
-    });
-
-
-  $$("[data-go-view]")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          showView(
-            button.dataset.goView
-          );
-
-        }
-      );
-
-    });
-
-
-  const homeStart =
-    $("#home-start-button");
-
-
-  if (homeStart) {
-
-    homeStart.addEventListener(
+    button.addEventListener(
       "click",
-      () => showView("flashcards")
+      () => {
+        loadVocabulary();
+      }
     );
-
-  }
-
-}
-
-
-function showView(viewName) {
-
-  $$(".view")
-    .forEach(view => {
-
-      view.classList.remove(
-        "active-view"
-      );
-
-    });
-
-
-  const target =
-    $(`#view-${viewName}`);
-
-
-  if (target) {
-
-    target.classList.add(
-      "active-view"
-    );
-
-  }
-
-
-  $$(".nav-button")
-    .forEach(button => {
-
-      button.classList.toggle(
-        "active",
-        button.dataset.view === viewName
-      );
-
-    });
-
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-
-
-  if (viewName === "progress") {
-
-    renderProgress();
 
   }
 
@@ -540,158 +653,199 @@ function showView(viewName) {
 
 function populateFilters() {
 
-  populateSelect(
-    $("#lesson-filter"),
-    uniqueValues(
-      state.vocabulary,
-      "Lesson#"
-    ),
-    "All Lessons"
-  );
+  const lessonSelect =
+    $("#lesson-filter");
+
+  const topicSelect =
+    $("#topic-filter");
+
+  const hskSelect =
+    $("#hsk-filter");
 
 
-  populateSelect(
-    $("#topic-filter"),
-    uniqueValues(
-      state.vocabulary,
-      "Topic"
-    ),
-    "All Topics"
-  );
+  /* LESSONS */
 
+  if (lessonSelect) {
 
-  populateSelect(
-    $("#hsk-filter"),
-    uniqueValues(
-      state.vocabulary,
-      "HSK_Level"
-    ),
-    "All HSK Levels"
-  );
+    const lessons =
+      [
+        ...new Set(
+          state.vocabulary
+            .map(
+              row =>
+                getLesson(row)
+            )
+            .filter(Boolean)
+        )
+      ];
 
-}
+    lessons.sort(
+      (a, b) =>
+        Number(a) - Number(b)
+    );
 
+    lessonSelect.innerHTML =
+      `<option value="">All Lessons</option>` +
+      lessons
+        .map(
+          lesson =>
+            `
+              <option value="${escapeAttribute(lesson)}">
+                ${escapeHTML(lesson)}
+              </option>
+            `
+        )
+        .join("");
 
-function uniqueValues(
-  rows,
-  column
-) {
-
-  return [
-    ...new Set(
-      rows
-        .map(row => clean(row[column]))
-        .filter(Boolean)
-    )
-  ].sort(
-    (a, b) =>
-      a.localeCompare(
-        b,
-        undefined,
-        {
-          numeric: true
-        }
-      )
-  );
-
-}
-
-
-function populateSelect(
-  select,
-  values,
-  defaultLabel
-) {
-
-  if (!select) {
-    return;
   }
 
 
-  select.innerHTML = "";
+  /* TOPICS */
+
+  if (topicSelect) {
+
+    const topics =
+      [
+        ...new Set(
+          state.vocabulary
+            .map(
+              row =>
+                getTopic(row)
+            )
+            .filter(Boolean)
+        )
+      ].sort();
+
+    topicSelect.innerHTML =
+      `<option value="">All Topics</option>` +
+      topics
+        .map(
+          topic =>
+            `
+              <option value="${escapeAttribute(topic)}">
+                ${escapeHTML(topic)}
+              </option>
+            `
+        )
+        .join("");
+
+  }
 
 
-  const defaultOption =
-    document.createElement("option");
+  /* HSK LEVELS */
+
+  if (hskSelect) {
+
+    const levels =
+      [
+        ...new Set(
+          state.vocabulary
+            .map(
+              row =>
+                getHSKLevel(row)
+            )
+            .filter(Boolean)
+        )
+      ].sort();
+
+    hskSelect.innerHTML =
+      `<option value="">All HSK Levels</option>` +
+      levels
+        .map(
+          level =>
+            `
+              <option value="${escapeAttribute(level)}">
+                ${escapeHTML(level)}
+              </option>
+            `
+        )
+        .join("");
+
+  }
 
 
-  defaultOption.value = "";
+  /* FILTER EVENTS */
 
-  defaultOption.textContent =
-    defaultLabel;
+  if (lessonSelect) {
 
-
-  select.appendChild(
-    defaultOption
-  );
-
-
-  values.forEach(value => {
-
-    const option =
-      document.createElement("option");
-
-
-    option.value =
-      value;
-
-    option.textContent =
-      value;
-
-
-    select.appendChild(
-      option
+    lessonSelect.addEventListener(
+      "change",
+      applyFilters
     );
 
-  });
+  }
+
+  if (topicSelect) {
+
+    topicSelect.addEventListener(
+      "change",
+      applyFilters
+    );
+
+  }
+
+  if (hskSelect) {
+
+    hskSelect.addEventListener(
+      "change",
+      applyFilters
+    );
+
+  }
 
 }
 
-
-/* ============================================================
-   FILTER VOCABULARY
-============================================================ */
 
 function applyFilters() {
 
   const lesson =
-    $("#lesson-filter").value;
+    $("#lesson-filter")?.value || "";
 
   const topic =
-    $("#topic-filter").value;
+    $("#topic-filter")?.value || "";
 
   const hsk =
-    $("#hsk-filter").value;
+    $("#hsk-filter")?.value || "";
 
 
   state.filteredVocabulary =
-    state.vocabulary.filter(row => {
+    state.vocabulary.filter(
+      row => {
 
-      const lessonMatch =
-        !lesson ||
-        clean(row["Lesson#"]) === lesson;
+        if (
+          lesson &&
+          getLesson(row) !== lesson
+        ) {
+          return false;
+        }
+
+        if (
+          topic &&
+          getTopic(row) !== topic
+        ) {
+          return false;
+        }
+
+        if (
+          hsk &&
+          getHSKLevel(row) !== hsk
+        ) {
+          return false;
+        }
+
+        return true;
+
+      }
+    );
 
 
-      const topicMatch =
-        !topic ||
-        clean(row.Topic) === topic;
-
-
-      const hskMatch =
-        !hsk ||
-        clean(row.HSK_Level) === hsk;
-
-
-      return (
-        lessonMatch &&
-        topicMatch &&
-        hskMatch
-      );
-
-    });
-
+  createDefaultStudySet();
 
   updateWordCount();
+
+  renderFlashcard();
+
+  renderReading();
 
 }
 
@@ -702,363 +856,229 @@ function applyFilters() {
 
 function createDefaultStudySet() {
 
-  const amount =
-    Math.min(
-      20,
-      state.vocabulary.length
-    );
+  const sizeValue =
+    $("#study-size")?.value || "all";
 
-
-  state.studySet =
-    shuffle(
-      state.vocabulary
-    ).slice(
-      0,
-      amount
-    );
-
-
-  state.cardIndex = 0;
-
-  state.cardFlipped = false;
-
-  renderFlashcard();
-
-}
-
-
-function createStudySet() {
-
-  applyFilters();
-
-
-  const requestedSize =
-    Number(
-      $("#study-size").value
-    );
-
-
-  if (!state.filteredVocabulary.length) {
-
-    alert(
-      "No words match your selected filters."
-    );
-
-    return;
-
-  }
-
-
-  const actualSize =
-    Math.min(
-      requestedSize,
-      state.filteredVocabulary.length
-    );
-
-
-  state.studySet =
+  const shuffled =
     shuffle(
       state.filteredVocabulary
-    ).slice(
-      0,
-      actualSize
     );
 
+  if (sizeValue === "all") {
+    state.studySet = shuffled;
+  } else {
+    const size = Number(sizeValue);
+
+    state.studySet =
+      shuffled.slice(
+        0,
+        Math.min(
+          size,
+          state.filteredVocabulary.length
+        )
+      );
+  }
 
   state.cardIndex = 0;
-
   state.cardFlipped = false;
-
-  renderFlashcard();
-
-}
-
-
-function setupFlashcards() {
-
-  $("#create-study-set")
-    .addEventListener(
-      "click",
-      createStudySet
-    );
-
-
-  $("#flashcard")
-    .addEventListener(
-      "click",
-      flipCard
-    );
-
-
-  $("#previous-card")
-    .addEventListener(
-      "click",
-      previousCard
-    );
-
-
-  $("#next-card")
-    .addEventListener(
-      "click",
-      nextCard
-    );
-
-
-  $("#shuffle-card")
-    .addEventListener(
-      "click",
-      shuffleCurrentSet
-    );
-
-
-  $("#flashcard-speak")
-    .addEventListener(
-      "click",
-      speakCurrentWord
-    );
-
-
-  $("#back-speak")
-    .addEventListener(
-      "click",
-      event => {
-
-        event.stopPropagation();
-
-        speakCurrentWord();
-
-      }
-    );
-
-}
-
-
-function renderFlashcard() {
-
-  const card =
-    state.studySet[
-      state.cardIndex
-    ];
-
-
-  if (!card) {
-
-    $("#flashcard-simplified")
-      .textContent = "—";
-
-
-    $("#flashcard-progress")
-      .textContent = "0 / 0";
-
-
-    $("#flashcard-details")
-      .innerHTML = "";
-
-
-    return;
-
-  }
-
-
-  $("#flashcard-simplified")
-    .textContent =
-    getWord(card);
-
-
-  $("#flashcard-progress")
-    .textContent =
-    `${state.cardIndex + 1} / ${state.studySet.length}`;
-
-
-  renderCardDetails(card);
-
-
-  $("#flashcard")
-    .classList.toggle(
-      "flipped",
-      state.cardFlipped
-    );
-
-}
-
-
-function renderCardDetails(row) {
-
-  const container =
-    $("#flashcard-details");
-
-
-  container.innerHTML = "";
-
-
-  const coreColumns = [
-    "Simplified",
-    "Traditional",
-    "Pinyin",
-    "English",
-    "Part of Speech",
-    "Lesson",
-    "Lesson#",
-    "Topic"
-  ];
-
-
-  const hskColumns = [
-    "HSK_Number",
-    "HSK_Hanzi",
-    "HSK_Pinyin",
-    "HSK_Level",
-    "CLI_English"
-  ];
-
-
-  addDetailSection(
-    container,
-    "Core Information",
-    row,
-    coreColumns
-  );
-
-
-  addDetailSection(
-    container,
-    "HSK / CLI Information",
-    row,
-    hskColumns
-  );
-
-
-  for (let i = 1; i <= 3; i++) {
-
-    addDetailSection(
-      container,
-      `Example ${i}`,
-      row,
-      [
-        `example${i}_chinese`,
-        `example${i}_pinyin`,
-        `example${i}_english`
-      ]
-    );
-
-  }
-
-}
-
-
-function addDetailSection(
-  container,
-  title,
-  row,
-  columns
-) {
-
-  const available =
-    columns.filter(
-      column =>
-        clean(row[column])
-    );
-
-
-  if (!available.length) {
-    return;
-  }
-
-
-  const section =
-    document.createElement("div");
-
-
-  section.className =
-    "detail-section";
-
-
-  const heading =
-    document.createElement("h4");
-
-
-  heading.textContent =
-    title;
-
-
-  section.appendChild(
-    heading
-  );
-
-
-  available.forEach(column => {
-
-    const rowElement =
-      document.createElement("div");
-
-
-    rowElement.className =
-      "detail-row";
-
-
-    const label =
-      document.createElement("div");
-
-
-    label.className =
-      "detail-label";
-
-
-    label.textContent =
-      prettyColumnName(column);
-
-
-    const value =
-      document.createElement("div");
-
-
-    value.className =
-      "detail-value";
-
-
-    value.textContent =
-      clean(row[column]);
-
-
-    rowElement.appendChild(label);
-
-    rowElement.appendChild(value);
-
-    section.appendChild(
-      rowElement
-    );
-
-  });
-
-
-  container.appendChild(
-    section
-  );
-
-}
-
-
-function prettyColumnName(column) {
-
-  return column
-    .replace(/_/g, " ")
-    .replace(
-      /([a-z])([A-Z])/g,
-      "$1 $2"
-    );
+  state.flashcardExample = null;
 
 }
 
 
 /* ============================================================
-   FLASHCARD CONTROLS
+   CREATE STUDY SET BUTTON
 ============================================================ */
 
-function flipCard() {
+function setupStudySetButton() {
+
+  const button =
+    $("#create-study-set");
+
+  if (button) {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        createDefaultStudySet();
+
+        renderFlashcard();
+
+      }
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   FLASHCARDS
+============================================================ */
+
+function setupFlashcards() {
+
+  const studySize =
+    $("#study-size");
+
+  if (studySize) {
+
+    studySize.addEventListener(
+      "change",
+      () => {
+
+        createDefaultStudySet();
+
+        renderFlashcard();
+
+      }
+    );
+
+  }
+
+
+  const next =
+    $("#next-card");
+
+  if (next) {
+
+    next.addEventListener(
+      "click",
+      nextCard
+    );
+
+  }
+
+
+  const previous =
+    $("#previous-card");
+
+  if (previous) {
+
+    previous.addEventListener(
+      "click",
+      previousCard
+    );
+
+  }
+
+
+  const shuffleButton =
+    $("#shuffle-card");
+
+  if (shuffleButton) {
+
+    shuffleButton.addEventListener(
+      "click",
+      () => {
+
+        state.studySet =
+          shuffle(
+            state.studySet
+          );
+
+        state.cardIndex = 0;
+
+        state.cardFlipped = false;
+
+        state.flashcardExample = null;
+
+        renderFlashcard();
+
+      }
+    );
+
+  }
+
+
+  const flashcard =
+    $("#flashcard");
+
+  if (flashcard) {
+
+    flashcard.addEventListener(
+      "click",
+      event => {
+
+        /*
+          Don't flip the card when clicking
+          one of the buttons on the back.
+        */
+
+        if (
+          event.target.closest(
+            "button"
+          )
+        ) {
+          return;
+        }
+
+        toggleCard();
+
+      }
+    );
+
+  }
+
+
+  const speak =
+    $("#flashcard-speak");
+
+  if (speak) {
+
+    speak.addEventListener(
+      "click",
+      event => {
+
+        event.stopPropagation();
+
+        speakChinese(
+          getCurrentFlashcardWord()
+        );
+
+      }
+    );
+
+  }
+
+
+  const backSpeak =
+    $("#back-speak");
+
+  if (backSpeak) {
+
+    backSpeak.addEventListener(
+      "click",
+      event => {
+
+        event.stopPropagation();
+
+        speakChinese(
+          getCurrentFlashcardWord()
+        );
+
+      }
+    );
+
+  }
+
+}
+
+
+function getCurrentFlashcardWord() {
+
+  return state.studySet[
+    state.cardIndex
+  ];
+
+}
+
+
+function toggleCard() {
 
   state.cardFlipped =
     !state.cardFlipped;
-
 
   renderFlashcard();
 
@@ -1067,33 +1087,21 @@ function flipCard() {
 
 function nextCard() {
 
-  if (!state.studySet.length) {
+  if (
+    !state.studySet.length
+  ) {
     return;
   }
 
-
-  recordStudyResult(
-    state.studySet[
-      state.cardIndex
-    ],
-    null
-  );
-
-
-  state.cardIndex++;
-
-
-  if (
-    state.cardIndex >=
-    state.studySet.length
-  ) {
-
-    state.cardIndex = 0;
-
-  }
-
+  state.cardIndex =
+    (
+      state.cardIndex + 1
+    ) %
+    state.studySet.length;
 
   state.cardFlipped = false;
+
+  state.flashcardExample = null;
 
   renderFlashcard();
 
@@ -1102,40 +1110,1458 @@ function nextCard() {
 
 function previousCard() {
 
-  if (!state.studySet.length) {
+  if (
+    !state.studySet.length
+  ) {
     return;
   }
 
-
-  state.cardIndex--;
-
-
-  if (state.cardIndex < 0) {
-
-    state.cardIndex =
-      state.studySet.length - 1;
-
-  }
-
+  state.cardIndex =
+    (
+      state.cardIndex -
+      1 +
+      state.studySet.length
+    ) %
+    state.studySet.length;
 
   state.cardFlipped = false;
+
+  state.flashcardExample = null;
 
   renderFlashcard();
 
 }
 
 
-function shuffleCurrentSet() {
+/* ============================================================
+   FLASHCARD RENDERING
+============================================================ */
+
+function renderFlashcard() {
+
+  const row =
+    getCurrentFlashcardWord();
+
+
+  if (!row) {
+
+    const front =
+      $("#flashcard-simplified");
+
+    if (front) {
+      front.textContent = "—";
+    }
+
+    const progress =
+      $("#flashcard-progress");
+
+    if (progress) {
+      progress.textContent = "0 / 0";
+    }
+
+    const details =
+      $("#flashcard-details");
+
+    if (details) {
+      details.innerHTML =
+        "<p>No vocabulary available.</p>";
+    }
+
+    return;
+
+  }
+
+
+  /* FRONT WORD */
+
+  const front =
+    $("#flashcard-simplified");
+
+  if (front) {
+
+    front.textContent =
+      clean(row.Simplified);
+
+  }
+
+
+  /* CARD POSITION */
+
+  const position =
+    $("#flashcard-progress");
+
+  if (position) {
+
+    position.textContent =
+      `${state.cardIndex + 1} / ${state.studySet.length}`;
+
+  }
+
+
+  /* CARD FLIP */
+
+  const card =
+    $("#flashcard");
+
+  if (card) {
+
+    card.classList.toggle(
+      "flipped",
+      state.cardFlipped
+    );
+
+  }
+
+
+  /* BACK DETAILS */
+
+  const details =
+    $("#flashcard-details");
+
+  if (details) {
+
+    renderCardDetails(
+      row
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   FLASHCARD BACK DETAILS
+============================================================ */
+
+/* ============================================================
+   FLASHCARD BACK DETAILS
+============================================================ */
+
+function renderCardDetails(row) {
+
+  const container = $("#flashcard-details");
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = "";
+
+
+  /* ==========================================================
+     SIMPLIFIED + TRADITIONAL + LESSON/TOPIC
+  ========================================================== */
+
+  
+  const simplified = clean(row.Simplified);
+const flashcardWord = document.getElementById("flashcard-simplified");
+
+const parenIndex = simplified.indexOf("(");
+
+if (parenIndex !== -1) {
+  const mainWord = simplified.slice(0, parenIndex).trim();
+  const parenthetical = simplified.slice(parenIndex).trim();
+
+  flashcardWord.innerHTML = "";
+
+  const mainWordElement = document.createElement("span");
+  mainWordElement.textContent = mainWord;
+
+  const noteElement = document.createElement("span");
+  noteElement.className = "traditional-note";
+  noteElement.textContent = parenthetical;
+
+  flashcardWord.appendChild(mainWordElement);
+  flashcardWord.appendChild(noteElement);
+} else {
+  flashcardWord.textContent = simplified;
+}
+  const traditional = clean(row.Traditional);
+
+  const lesson = getLesson(row);
+  const topic = getTopic(row);
+
+
+  if (
+    simplified ||
+    traditional ||
+    lesson ||
+    topic
+  ) {
+
+    const section = document.createElement("div");
+    section.className = "detail-section";
+
+    const wordLine = document.createElement("div");
+    wordLine.className = "detail-word-line";
+
+
+    /* ---------- SIMPLIFIED ---------- */
+
+    if (simplified) {
+
+      const simplifiedGroup =
+        document.createElement("span");
+
+      simplifiedGroup.className =
+        "detail-word-group";
+
+
+      const simplifiedLabel =
+        document.createElement("span");
+
+      simplifiedLabel.className =
+        "detail-word-label";
+
+      simplifiedLabel.textContent =
+        "Simplified: ";
+
+
+      const simplifiedElement =
+        document.createElement("span");
+
+      simplifiedElement.className =
+        "detail-word-simplified";
+
+      simplifiedElement.textContent =
+        simplified;
+
+
+      simplifiedGroup.appendChild(
+        simplifiedLabel
+      );
+
+      simplifiedGroup.appendChild(
+        simplifiedElement
+      );
+
+      wordLine.appendChild(
+        simplifiedGroup
+      );
+
+    }
+
+
+    /* ---------- TRADITIONAL ---------- */
+
+    if (traditional) {
+
+      const traditionalGroup =
+        document.createElement("span");
+
+      traditionalGroup.className =
+        "detail-word-group";
+
+
+      const traditionalLabel =
+        document.createElement("span");
+
+      traditionalLabel.className =
+        "detail-word-label";
+
+      traditionalLabel.textContent =
+        "Traditional: ";
+
+
+      const traditionalElement =
+        document.createElement("span");
+
+      traditionalElement.className =
+        "detail-word-traditional";
+
+      traditionalElement.textContent =
+        traditional;
+
+
+      traditionalGroup.appendChild(
+        traditionalLabel
+      );
+
+      traditionalGroup.appendChild(
+        traditionalElement
+      );
+
+      wordLine.appendChild(
+        traditionalGroup
+      );
+
+    }
+
+
+    /* ---------- LESSON + TOPIC ---------- */
+
+    if (lesson || topic) {
+
+      const lessonGroup =
+        document.createElement("span");
+
+      lessonGroup.className =
+        "detail-lesson-group";
+
+
+      let lessonText = "";
+
+      if (lesson && topic) {
+
+        lessonText =
+          `Lesson ${lesson}: ${topic}`;
+
+      } else if (lesson) {
+
+        lessonText =
+          `Lesson ${lesson}`;
+
+      } else {
+
+        lessonText =
+          topic;
+
+      }
+
+
+      lessonGroup.textContent =
+        lessonText;
+
+
+      wordLine.appendChild(
+        lessonGroup
+      );
+
+    }
+
+
+    section.appendChild(
+      wordLine
+    );
+
+    container.appendChild(
+      section
+    );
+
+  }
+
+
+  /* ==========================================================
+     PINYIN / ENGLISH / PART OF SPEECH
+  ========================================================== */
+
+  const coreSection =
+    document.createElement("div");
+
+  coreSection.className =
+    "detail-section";
+
+
+  const pinyin =
+    clean(row.Pinyin);
+
+  if (pinyin) {
+
+    coreSection.appendChild(
+      createSimpleDetailRow(
+        "Pinyin",
+        pinyin
+      )
+    );
+
+  }
+
+
+  const english =
+    clean(row.English);
+
+  if (english) {
+
+    coreSection.appendChild(
+      createSimpleDetailRow(
+        "English",
+        english
+      )
+    );
+
+  }
+
+
+  const partOfSpeech =
+    getRowValue(
+      row,
+      [
+        "Part of Speech",
+        "Part_of_Speech",
+        "Part of speech",
+        "POS"
+      ]
+    );
+
+  if (partOfSpeech) {
+
+    coreSection.appendChild(
+      createSimpleDetailRow(
+        "Part of Speech",
+        partOfSpeech
+      )
+    );
+
+  }
+
+
+  if (coreSection.children.length) {
+
+    container.appendChild(
+      coreSection
+    );
+
+  }
+
+
+  /* ==========================================================
+     HSK + CLI
+     ITALICIZED
+  ========================================================== */
+
+  const hskNumber =
+    getHSKNumber(row);
+
+  const hskLevel =
+    getHSKLevel(row);
+
+  const cliEnglish =
+    getCLIEnglish(row);
+
+
+  if (
+    hskNumber ||
+    hskLevel ||
+    cliEnglish
+  ) {
+
+    const hskSection =
+      document.createElement("div");
+
+    hskSection.className =
+      "detail-section";
+
+
+    /* ---------- HSK ---------- */
+
+    if (
+      hskNumber ||
+      hskLevel
+    ) {
+
+      const hskLine =
+        document.createElement("div");
+
+      hskLine.className =
+        "detail-row detail-reference";
+
+
+      let hskText =
+        "HSK Number: ";
+
+
+      if (hskNumber) {
+
+        hskText +=
+          hskNumber;
+
+      }
+
+
+      if (
+        hskNumber &&
+        hskLevel
+      ) {
+
+        hskText +=
+          " — Level: ";
+
+      }
+
+
+      if (hskLevel) {
+
+        hskText +=
+          hskLevel;
+
+      }
+
+
+      hskLine.textContent =
+        hskText;
+
+
+      hskSection.appendChild(
+        hskLine
+      );
+
+    }
+
+
+    /* ---------- CLI ---------- */
+
+    if (cliEnglish) {
+
+      const cliLine =
+        document.createElement("div");
+
+      cliLine.className =
+        "detail-row detail-reference";
+
+
+      cliLine.textContent =
+        `CLI English: ${cliEnglish}`;
+
+
+      hskSection.appendChild(
+        cliLine
+      );
+
+    }
+
+
+    container.appendChild(
+      hskSection
+    );
+
+  }
+
+
+  /* ==========================================================
+     ONE RANDOM EXAMPLE PER CARD
+  ========================================================== */
+
+  const examples =
+    getAvailableExamples(row);
+
+
+  /*
+    Choose the example only once for this card.
+    Flipping the card will NOT change the example.
+  */
+
+  if (
+    !state.flashcardExample ||
+    state.flashcardExample.row !== row
+  ) {
+
+    const randomExample =
+      examples.length
+        ? examples[
+            Math.floor(
+              Math.random() *
+              examples.length
+            )
+          ]
+        : null;
+
+
+    state.flashcardExample = {
+      row,
+      example: randomExample
+    };
+
+  }
+
+
+  const randomExample =
+    state.flashcardExample.example;
+
+
+  /* ==========================================================
+     EXAMPLE SENTENCE
+  ========================================================== */
+
+  if (randomExample) {
+
+    const exampleSection =
+      document.createElement("div");
+
+    exampleSection.className =
+      "detail-section";
+
+
+    const heading =
+      document.createElement("h4");
+
+    heading.textContent =
+      `Example ${randomExample.number}`;
+
+
+    exampleSection.appendChild(
+      heading
+    );
+
+
+    /* ---------- CHINESE ---------- */
+
+    if (randomExample.chinese) {
+
+      const chinese =
+        document.createElement("div");
+
+      chinese.className =
+        "example-chinese";
+
+      chinese.textContent =
+        randomExample.chinese;
+
+
+      exampleSection.appendChild(
+        chinese
+      );
+
+    }
+
+
+    /* ---------- PINYIN ---------- */
+
+    if (randomExample.pinyin) {
+
+      const examplePinyin =
+        document.createElement("div");
+
+      examplePinyin.className =
+        "example-pinyin";
+
+      examplePinyin.textContent =
+        randomExample.pinyin;
+
+
+      exampleSection.appendChild(
+        examplePinyin
+      );
+
+    }
+
+
+    /* ---------- ENGLISH ---------- */
+
+    if (randomExample.english) {
+
+      const exampleEnglish =
+        document.createElement("div");
+
+      exampleEnglish.className =
+        "example-english";
+
+      exampleEnglish.textContent =
+        randomExample.english;
+
+
+      exampleSection.appendChild(
+        exampleEnglish
+      );
+
+    }
+
+
+    container.appendChild(
+      exampleSection
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   SIMPLE DETAIL ROW
+============================================================ */
+
+function createSimpleDetailRow(
+  label,
+  value
+) {
+
+  const rowElement =
+    document.createElement(
+      "div"
+    );
+
+  rowElement.className =
+    "detail-row";
+
+
+  const labelElement =
+    document.createElement(
+      "div"
+    );
+
+  labelElement.className =
+    "detail-label";
+
+  labelElement.textContent =
+    label;
+
+
+  const valueElement =
+    document.createElement(
+      "div"
+    );
+
+  valueElement.className =
+    "detail-value";
+
+  valueElement.textContent =
+    clean(value);
+
+
+  rowElement.appendChild(
+    labelElement
+  );
+
+  rowElement.appendChild(
+    valueElement
+  );
+
+
+  return rowElement;
+
+}
+
+
+/* ============================================================
+   SPEECH
+============================================================ */
+
+function speakChinese(row) {
+
+  if (!row) {
+    return;
+  }
+
+  const text =
+    clean(row.Simplified);
+
+  if (!text) {
+    return;
+  }
+
+  if (
+    !("speechSynthesis" in window)
+  ) {
+
+    console.warn(
+      "Speech synthesis is not supported by this browser."
+    );
+
+    return;
+
+  }
+
+  window.speechSynthesis.cancel();
+
+  const utterance =
+    new SpeechSynthesisUtterance(
+      text
+    );
+
+  utterance.lang =
+    "zh-CN";
+
+  utterance.rate =
+    0.85;
+
+  window.speechSynthesis.speak(
+    utterance
+  );
+
+}
+
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+
+function setupNavigation() {
+
+  $$(".nav-button").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const view =
+            button.dataset.view;
+
+          if (view) {
+
+            showView(
+              view
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+
+  $$(".action-card").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const view =
+            button.dataset.goView;
+
+          if (view) {
+
+            showView(
+              view
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+
+  const homeStart =
+    $("#home-start-button");
+
+  if (homeStart) {
+
+    homeStart.addEventListener(
+      "click",
+      () => {
+        showView("flashcards");
+      }
+    );
+
+  }
+
+
+  const exitGame =
+    $("#exit-game");
+
+  if (exitGame) {
+
+    exitGame.addEventListener(
+      "click",
+      () => {
+
+        const gameArea =
+          $("#game-area");
+
+        if (gameArea) {
+
+          gameArea.classList.add(
+            "hidden"
+          );
+
+        }
+
+        const selection =
+          $("#game-selection");
+
+        if (selection) {
+
+          selection.classList.remove(
+            "hidden"
+          );
+
+        }
+
+      }
+    );
+
+  }
+
+}
+
+
+function showView(viewName) {
+
+  $$(".view").forEach(
+    view => {
+
+      view.classList.toggle(
+        "active-view",
+        view.id ===
+          `view-${viewName}`
+      );
+
+    }
+  );
+
+
+  $$(".nav-button").forEach(
+    button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.view ===
+          viewName
+      );
+
+    }
+  );
+
+}
+
+
+/* ============================================================
+   HOME BUTTONS
+============================================================ */
+
+function setupHomeButtons() {
+
+  $$(".action-card").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const view =
+            button.dataset.goView;
+
+          if (view) {
+
+            showView(
+              view
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+}
+
+
+/* ============================================================
+   STATISTICS
+============================================================ */
+
+function updateStats() {
+
+  const total =
+    state.vocabulary.length;
+
+
+  const homeTotal =
+    $("#home-total-words");
+
+  if (homeTotal) {
+
+    homeTotal.textContent =
+      total;
+
+  }
+
+
+  const practiced =
+    Object.keys(
+      state.progress
+    ).length;
+
+
+  const homeMastered =
+    $("#home-mastered");
+
+  if (homeMastered) {
+
+    homeMastered.textContent =
+      calculateMastered();
+
+  }
+
+
+  const homeReview =
+    $("#home-review");
+
+  if (homeReview) {
+
+    homeReview.textContent =
+      calculateNeedsReview();
+
+  }
+
+
+  const homeAccuracy =
+    $("#home-accuracy");
+
+  if (homeAccuracy) {
+
+    homeAccuracy.textContent =
+      `${calculateAccuracy()}%`;
+
+  }
+
+
+  updateProgressDisplay();
+
+}
+
+
+function updateWordCount() {
+
+  const count =
+    $("#word-count");
+
+  if (count) {
+
+    count.textContent =
+      `${state.filteredVocabulary.length} words`;
+
+  }
+
+}
+
+
+/* ============================================================
+   PROGRESS
+============================================================ */
+
+function loadProgress() {
+
+  try {
+
+    const saved =
+      localStorage.getItem(
+        "chineseStudyProgress"
+      );
+
+    if (saved) {
+
+      state.progress =
+        JSON.parse(
+          saved
+        );
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Could not load progress:",
+      error
+    );
+
+    state.progress = {};
+
+  }
+
+}
+
+
+function saveProgress() {
+
+  try {
+
+    localStorage.setItem(
+      "chineseStudyProgress",
+      JSON.stringify(
+        state.progress
+      )
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Could not save progress:",
+      error
+    );
+
+  }
+
+}
+
+
+function markWordProgress(
+  row,
+  correct
+) {
+
+  const word =
+    clean(row?.Simplified);
+
+  if (!word) {
+    return;
+  }
+
+
+  if (
+    !state.progress[word]
+  ) {
+
+    state.progress[word] = {
+      seen: 0,
+      correct: 0,
+      incorrect: 0
+    };
+
+  }
+
+
+  state.progress[word].seen++;
+
+
+  if (correct) {
+
+    state.progress[word].correct++;
+
+  } else {
+
+    state.progress[word].incorrect++;
+
+  }
+
+
+  saveProgress();
+
+  updateStats();
+
+}
+
+
+/* ============================================================
+   PROGRESS CALCULATIONS
+============================================================ */
+
+function calculateAccuracy() {
+
+  let correct = 0;
+  let incorrect = 0;
+
+
+  Object.values(
+    state.progress
+  ).forEach(
+    item => {
+
+      correct +=
+        Number(
+          item.correct || 0
+        );
+
+      incorrect +=
+        Number(
+          item.incorrect || 0
+        );
+
+    }
+  );
+
+
+  const total =
+    correct + incorrect;
+
+
+  if (!total) {
+    return 0;
+  }
+
+
+  return Math.round(
+    (
+      correct /
+      total
+    ) * 100
+  );
+
+}
+
+
+function calculateMastered() {
+
+  return Object.values(
+    state.progress
+  )
+    .filter(
+      item =>
+        Number(item.correct || 0) >= 3 &&
+        Number(item.correct || 0) >
+          Number(item.incorrect || 0)
+    )
+    .length;
+
+}
+
+
+function calculateNeedsReview() {
+
+  return Object.values(
+    state.progress
+  )
+    .filter(
+      item =>
+        Number(item.incorrect || 0) >
+        Number(item.correct || 0)
+    )
+    .length;
+
+}
+
+
+/* ============================================================
+   PROGRESS DISPLAY
+============================================================ */
+
+function setupProgress() {
+
+  const reset =
+    $("#reset-progress");
+
+  if (reset) {
+
+    reset.addEventListener(
+      "click",
+      resetProgress
+    );
+
+  }
+
+
+  const review =
+    $("#review-incorrect");
+
+  if (review) {
+
+    review.addEventListener(
+      "click",
+      reviewIncorrectWords
+    );
+
+  }
+
+
+  renderProgressList();
+
+}
+
+
+function renderProgressList() {
+
+  const container =
+    $("#progress-list");
+
+  if (!container) {
+    return;
+  }
+
+
+  const rows =
+    state.vocabulary.filter(
+      row =>
+        state.progress[
+          clean(row.Simplified)
+        ]
+    );
+
+
+  if (!rows.length) {
+
+    container.innerHTML =
+      "<p>No study progress yet.</p>";
+
+    return;
+
+  }
+
+
+  container.innerHTML =
+    rows
+      .map(
+        row => {
+
+          const word =
+            clean(row.Simplified);
+
+          const progress =
+            state.progress[word];
+
+
+          return `
+            <div class="progress-row">
+
+              <div class="progress-word">
+                ${escapeHTML(word)}
+              </div>
+
+              <div class="progress-english">
+                ${escapeHTML(clean(row.English))}
+              </div>
+
+              <div class="progress-count">
+                Seen: ${progress.seen || 0}
+              </div>
+
+              <div class="progress-count">
+                Correct: ${progress.correct || 0}
+              </div>
+
+              <div class="progress-count">
+                Incorrect: ${progress.incorrect || 0}
+              </div>
+
+            </div>
+          `;
+
+        }
+      )
+      .join("");
+
+}
+
+
+function updateProgressDisplay() {
+
+  const total =
+    $("#progress-total");
+
+  const mastered =
+    $("#progress-mastered");
+
+  const review =
+    $("#progress-review");
+
+  const accuracy =
+    $("#progress-accuracy");
+
+
+  const practiced =
+    Object.keys(
+      state.progress
+    ).length;
+
+
+  if (total) {
+
+    total.textContent =
+      practiced;
+
+  }
+
+
+  if (mastered) {
+
+    mastered.textContent =
+      calculateMastered();
+
+  }
+
+
+  if (review) {
+
+    review.textContent =
+      calculateNeedsReview();
+
+  }
+
+
+  if (accuracy) {
+
+    accuracy.textContent =
+      `${calculateAccuracy()}%`;
+
+  }
+
+
+  renderProgressList();
+
+}
+
+
+function resetProgress() {
+
+  const confirmed =
+    window.confirm(
+      "Reset all vocabulary progress?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  state.progress = {};
+
+  saveProgress();
+
+  updateStats();
+
+  updateProgressDisplay();
+
+}
+
+
+function reviewIncorrectWords() {
+
+  const incorrectWords =
+    state.vocabulary.filter(
+      row => {
+
+        const progress =
+          state.progress[
+            clean(row.Simplified)
+          ];
+
+        return (
+          progress &&
+          Number(progress.incorrect || 0) >
+            Number(progress.correct || 0)
+        );
+
+      }
+    );
+
+
+  if (!incorrectWords.length) {
+
+    window.alert(
+      "There are no words currently marked for review."
+    );
+
+    return;
+
+  }
+
+
+  state.filteredVocabulary =
+    incorrectWords;
 
   state.studySet =
-    shuffle(state.studySet);
+    shuffle(
+      incorrectWords
+    ).slice(
+      0,
+      Math.min(
+        Number(
+          $("#study-size")?.value || 20
+        ),
+        incorrectWords.length
+      )
+    );
 
 
   state.cardIndex = 0;
 
   state.cardFlipped = false;
 
+  state.flashcardExample = null;
+
+  updateWordCount();
+
   renderFlashcard();
+
+  showView(
+    "flashcards"
+  );
 
 }
 
@@ -1144,302 +2570,130 @@ function shuffleCurrentSet() {
    READING
 ============================================================ */
 
-function initializeReading() {
-
-  state.readingVocabulary =
-    state.vocabulary.filter(row => {
-
-      for (let i = 1; i <= 3; i++) {
-
-        if (
-          clean(
-            row[`example${i}_chinese`]
-          )
-        ) {
-
-          return true;
-
-        }
-
-      }
-
-      return false;
-
-    });
-
-
-  state.readingVocabulary =
-    shuffle(
-      state.readingVocabulary
-    );
-
-
-  state.readingIndex = 0;
-
-  state.readingExampleNumber = 1;
-
-  renderReading();
-
-}
-
-
 function setupReading() {
 
-  $("#previous-reading")
-    .addEventListener(
+  const previous =
+    $("#previous-reading");
+
+  if (previous) {
+
+    previous.addEventListener(
       "click",
       previousReading
     );
 
+  }
 
-  $("#next-reading")
-    .addEventListener(
+
+  const next =
+    $("#next-reading");
+
+  if (next) {
+
+    next.addEventListener(
       "click",
       nextReading
     );
 
+  }
 
-  $("#random-reading")
-    .addEventListener(
+
+  const random =
+    $("#random-reading");
+
+  if (random) {
+
+    random.addEventListener(
       "click",
       randomReading
     );
 
+  }
 
-  $("#show-example-details")
-    .addEventListener(
+
+  const speak =
+    $("#reading-speak");
+
+  if (speak) {
+
+    speak.addEventListener(
       "click",
-      toggleExampleDetails
+      () => {
+
+        if (
+          state.currentReadingExample
+        ) {
+
+          speakText(
+            state.currentReadingExample.chinese
+          );
+
+        }
+
+      }
     );
-
-
-  $("#reading-speak")
-    .addEventListener(
-      "click",
-      speakReadingSentence
-    );
-
-
-  $("#reading-sentence")
-    .addEventListener(
-      "click",
-      handleCharacterClick
-    );
-
-
-  $("#reading-sentence")
-    .addEventListener(
-      "mouseover",
-      handleCharacterHover
-    );
-
-
-  $("#reading-sentence")
-    .addEventListener(
-      "mouseout",
-      hideCharacterTooltip
-    );
-
-}
-
-
-function getCurrentReadingRow() {
-
-  return state.readingVocabulary[
-    state.readingIndex
-  ];
-
-}
-
-
-function getAvailableExamples(row) {
-
-  const examples = [];
-
-
-  for (let i = 1; i <= 3; i++) {
-
-    const chinese =
-      clean(
-        row[`example${i}_chinese`]
-      );
-
-
-    if (chinese) {
-
-      examples.push({
-
-        number: i,
-
-        chinese,
-
-        pinyin: clean(
-          row[`example${i}_pinyin`]
-        ),
-
-        english: clean(
-          row[`example${i}_english`]
-        )
-
-      });
-
-    }
 
   }
 
 
-  return examples;
+  const details =
+    $("#show-example-details");
+
+  if (details) {
+
+    details.addEventListener(
+      "click",
+      toggleExampleDetails
+    );
+
+  }
+
+}
+
+
+function getReadingCandidates() {
+
+  const words =
+    state.filteredVocabulary.length
+      ? state.filteredVocabulary
+      : state.vocabulary;
+
+
+  return words.filter(
+    row =>
+      getAvailableExamples(row).length
+  );
 
 }
 
 
 function renderReading() {
 
-  const row =
-    getCurrentReadingRow();
-
-
-  if (!row) {
-
-    $("#reading-sentence")
-      .textContent =
-      "No example sentences available.";
-
-    return;
-
-  }
-
-
-  const examples =
-    getAvailableExamples(row);
-
-
-  if (!examples.length) {
-    return;
-  }
-
-
-  if (
-    !examples.some(
-      ex =>
-        ex.number ===
-        state.readingExampleNumber
-    )
-  ) {
-
-    state.readingExampleNumber =
-      examples[0].number;
-
-  }
-
-
-  const example =
-    examples.find(
-      ex =>
-        ex.number ===
-        state.readingExampleNumber
-    );
-
-
-  $("#reading-example-label")
-    .textContent =
-    `Example ${example.number}`;
-
-
-  renderReadingSentence(
-    example.chinese
-  );
-
-
-  $("#example-pinyin-text")
-    .textContent =
-    example.pinyin ||
-    "No pinyin available.";
-
-
-  $("#example-english-text")
-    .textContent =
-    example.english ||
-    "No English translation available.";
-
-
-  $("#example-details")
-    .classList.add("hidden");
-
-
-  $("#show-example-details")
-    .textContent =
-    "Show Pinyin & English";
-
-}
-
-
-function renderReadingSentence(sentence) {
-
   const container =
     $("#reading-sentence");
 
-
-  container.innerHTML = "";
-
-
-  for (
-    const character of sentence
-  ) {
-
-    if (
-      /\s/.test(character)
-    ) {
-
-      container.appendChild(
-        document.createTextNode(character)
-      );
-
-      continue;
-
-    }
-
-
-    const span =
-      document.createElement("span");
-
-
-    span.className =
-      "reading-character";
-
-
-    span.textContent =
-      character;
-
-
-    span.dataset.character =
-      character;
-
-
-    container.appendChild(
-      span
-    );
-
-  }
-
-}
-
-
-function nextReading() {
-
-  if (
-    !state.readingVocabulary.length
-  ) {
+  if (!container) {
     return;
   }
 
 
-  state.readingIndex++;
+  const candidates =
+    getReadingCandidates();
+
+
+  if (!candidates.length) {
+
+    container.innerHTML =
+      "<p>No example sentences are available.</p>";
+
+    return;
+
+  }
 
 
   if (
     state.readingIndex >=
-    state.readingVocabulary.length
+    candidates.length
   ) {
 
     state.readingIndex = 0;
@@ -1447,34 +2701,396 @@ function nextReading() {
   }
 
 
-  state.readingExampleNumber = 1;
+  const row =
+    candidates[
+      state.readingIndex
+    ];
 
-  renderReading();
+
+  const examples =
+    getAvailableExamples(
+      row
+    );
+
+
+  let example =
+    examples.find(
+      item =>
+        item.number ===
+        state.readingExampleNumber
+    );
+
+
+  if (!example) {
+
+    example =
+      examples[0];
+
+  }
+
+
+  state.currentReadingRow =
+    row;
+
+  state.currentReadingExample =
+    example;
+
+
+  const label =
+    $("#reading-example-label");
+
+  if (label) {
+
+    label.textContent =
+      `Example ${example.number}`;
+
+  }
+
+
+  container.innerHTML =
+    renderInteractiveChinese(
+      example.chinese
+    );
+
+
+  const pinyin =
+    $("#example-pinyin-text");
+
+  if (pinyin) {
+
+    pinyin.textContent =
+      example.pinyin || "";
+
+  }
+
+
+  const english =
+    $("#example-english-text");
+
+  if (english) {
+
+    english.textContent =
+      example.english || "";
+
+  }
+
+
+  const details =
+    $("#example-details");
+
+  if (details) {
+
+    details.classList.add(
+      "hidden"
+    );
+
+  }
+
+
+  const detailsButton =
+    $("#show-example-details");
+
+  if (detailsButton) {
+
+    detailsButton.textContent =
+      "Show Pinyin & English";
+
+  }
+
+
+  updateCharacterPanel(
+    null
+  );
+
+
+  attachCharacterEvents();
+
+}
+
+
+function renderInteractiveChinese(text) {
+
+  return Array.from(
+    clean(text)
+  )
+    .map(
+      character => {
+
+        if (
+          /\s/.test(character)
+        ) {
+
+          return " ";
+
+        }
+
+
+        return `
+          <span
+            class="reading-character"
+            data-character="${escapeAttribute(character)}"
+          >
+            ${escapeHTML(character)}
+          </span>
+        `;
+
+      }
+    )
+    .join("");
+
+}
+
+
+function attachCharacterEvents() {
+
+  $$(".reading-character")
+    .forEach(
+      element => {
+
+        element.addEventListener(
+          "mouseenter",
+          () => {
+
+            showCharacterInfo(
+              element.dataset.character
+            );
+
+          }
+        );
+
+
+        element.addEventListener(
+          "click",
+          () => {
+
+            showCharacterInfo(
+              element.dataset.character
+            );
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+function showCharacterInfo(
+  character
+) {
+
+  const matchingRows =
+    state.vocabulary.filter(
+      row => {
+
+        const simplified =
+          clean(row.Simplified);
+
+        const traditional =
+          clean(row.Traditional);
+
+        return (
+          simplified.includes(character) ||
+          traditional.includes(character)
+        );
+
+      }
+    );
+
+
+  if (!matchingRows.length) {
+
+    updateCharacterPanel({
+      character
+    });
+
+    return;
+
+  }
+
+
+  const row =
+    matchingRows[0];
+
+
+  updateCharacterPanel({
+    character,
+    row
+  });
+
+}
+
+
+function updateCharacterPanel(
+  data
+) {
+
+  const panel =
+    $("#character-details");
+
+  if (!panel) {
+    return;
+  }
+
+
+  if (!data) {
+
+    panel.innerHTML = `
+      <div class="character-placeholder">
+
+        <div class="large-placeholder-character">
+          字
+        </div>
+
+        <h3>Character Information</h3>
+
+        <p>
+          Hover over or click a Chinese character
+          in the sentence.
+        </p>
+
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  const character =
+    clean(data.character);
+
+
+  const row =
+    data.row;
+
+
+  if (!row) {
+
+    panel.innerHTML = `
+      <div class="character-info">
+
+        <div class="character-display">
+          ${escapeHTML(character)}
+        </div>
+
+        <h3>${escapeHTML(character)}</h3>
+
+        <p>
+          No vocabulary entry was found for this character.
+        </p>
+
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  const simplified =
+    clean(row.Simplified);
+
+  const traditional =
+    clean(row.Traditional);
+
+  const pinyin =
+    clean(row.Pinyin);
+
+  const english =
+    clean(row.English);
+
+  const cli =
+    getCLIEnglish(row);
+
+
+  panel.innerHTML = `
+    <div class="character-info">
+
+      <div class="character-display">
+        ${escapeHTML(character)}
+      </div>
+
+      <div class="character-detail-row">
+        <strong>Simplified</strong>
+        <span>${escapeHTML(simplified)}</span>
+      </div>
+
+      <div class="character-detail-row">
+        <strong>Traditional</strong>
+        <span>${escapeHTML(traditional || simplified)}</span>
+      </div>
+
+      <div class="character-detail-row">
+        <strong>Pinyin</strong>
+        <span>${escapeHTML(pinyin)}</span>
+      </div>
+
+      <div class="character-detail-row">
+        <strong>English</strong>
+        <span>${escapeHTML(english)}</span>
+      </div>
+
+      ${
+        cli
+          ? `
+            <div class="character-detail-row">
+              <strong>CLI</strong>
+              <span>${escapeHTML(cli)}</span>
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+  `;
 
 }
 
 
 function previousReading() {
 
-  if (
-    !state.readingVocabulary.length
-  ) {
+  const candidates =
+    getReadingCandidates();
+
+
+  if (!candidates.length) {
     return;
   }
 
 
-  state.readingIndex--;
+  state.readingIndex =
+    (
+      state.readingIndex -
+      1 +
+      candidates.length
+    ) %
+    candidates.length;
 
 
-  if (state.readingIndex < 0) {
+  renderReading();
 
-    state.readingIndex =
-      state.readingVocabulary.length - 1;
+}
 
+
+function nextReading() {
+
+  const candidates =
+    getReadingCandidates();
+
+
+  if (!candidates.length) {
+    return;
   }
 
 
-  state.readingExampleNumber = 1;
+  state.readingIndex =
+    (
+      state.readingIndex + 1
+    ) %
+    candidates.length;
+
 
   renderReading();
 
@@ -1483,9 +3099,11 @@ function previousReading() {
 
 function randomReading() {
 
-  if (
-    !state.readingVocabulary.length
-  ) {
+  const candidates =
+    getReadingCandidates();
+
+
+  if (!candidates.length) {
     return;
   }
 
@@ -1493,31 +3111,27 @@ function randomReading() {
   state.readingIndex =
     Math.floor(
       Math.random() *
-      state.readingVocabulary.length
+      candidates.length
     );
 
 
-  const row =
-    getCurrentReadingRow();
-
-
   const examples =
-    getAvailableExamples(row);
+    getAvailableExamples(
+      candidates[
+        state.readingIndex
+      ]
+    );
 
 
   if (examples.length) {
 
-    const randomExample =
+    state.readingExampleNumber =
       examples[
         Math.floor(
           Math.random() *
           examples.length
         )
-      ];
-
-
-    state.readingExampleNumber =
-      randomExample.number;
+      ].number;
 
   }
 
@@ -1532,6 +3146,14 @@ function toggleExampleDetails() {
   const details =
     $("#example-details");
 
+  const button =
+    $("#show-example-details");
+
+
+  if (!details) {
+    return;
+  }
+
 
   const hidden =
     details.classList.toggle(
@@ -1539,387 +3161,34 @@ function toggleExampleDetails() {
     );
 
 
-  $("#show-example-details")
-    .textContent =
-    hidden
-      ? "Show Pinyin & English"
-      : "Hide Pinyin & English";
+  if (button) {
 
-}
-
-
-/* ============================================================
-   CHARACTER LOOKUP
-============================================================ */
-
-function findCharacterInformation(
-  character
-) {
-
-  let result =
-    state.vocabulary.find(
-      row =>
-        getWord(row) === character
-    );
-
-
-  if (result) {
-    return result;
-  }
-
-
-  result =
-    state.vocabulary.find(
-      row =>
-        clean(row.Traditional) === character
-    );
-
-
-  if (result) {
-    return result;
-  }
-
-
-  result =
-    state.vocabulary.find(
-      row =>
-        getWord(row).includes(character)
-    );
-
-
-  return result || null;
-
-}
-
-
-function handleCharacterClick(event) {
-
-  const characterElement =
-    event.target.closest(
-      ".reading-character"
-    );
-
-
-  if (!characterElement) {
-    return;
-  }
-
-
-  const character =
-    characterElement.dataset.character;
-
-
-  const row =
-    findCharacterInformation(
-      character
-    );
-
-
-  renderCharacterDetails(
-    character,
-    row
-  );
-
-}
-
-
-function handleCharacterHover(event) {
-
-  const characterElement =
-    event.target.closest(
-      ".reading-character"
-    );
-
-
-  if (!characterElement) {
-    return;
-  }
-
-
-  const character =
-    characterElement.dataset.character;
-
-
-  const row =
-    findCharacterInformation(
-      character
-    );
-
-
-  showCharacterTooltip(
-    characterElement,
-    character,
-    row
-  );
-
-}
-
-
-function showCharacterTooltip(
-  element,
-  character,
-  row
-) {
-
-  let tooltip =
-    $("#character-tooltip");
-
-
-  if (!tooltip) {
-
-    tooltip =
-      document.createElement("div");
-
-
-    tooltip.id =
-      "character-tooltip";
-
-
-    tooltip.className =
-      "character-tooltip";
-
-
-    document.body.appendChild(
-      tooltip
-    );
+    button.textContent =
+      hidden
+        ? "Show Pinyin & English"
+        : "Hide Pinyin & English";
 
   }
-
-
-  if (row) {
-
-    tooltip.innerHTML = `
-
-      <div class="tooltip-character">
-        ${escapeHTML(character)}
-      </div>
-
-      <div class="tooltip-pinyin">
-        ${escapeHTML(
-          clean(row.Pinyin) ||
-          clean(row.HSK_Pinyin) ||
-          "No pinyin"
-        )}
-      </div>
-
-      <div class="tooltip-english">
-        ${escapeHTML(
-          clean(row.English) ||
-          clean(row.CLI_English) ||
-          "No English"
-        )}
-      </div>
-
-    `;
-
-  } else {
-
-    tooltip.innerHTML = `
-
-      <div class="tooltip-character">
-        ${escapeHTML(character)}
-      </div>
-
-      <div class="tooltip-english">
-        No vocabulary entry found
-      </div>
-
-    `;
-
-  }
-
-
-  const rect =
-    element.getBoundingClientRect();
-
-
-  tooltip.style.display =
-    "block";
-
-
-  let left =
-    rect.left +
-    rect.width / 2 -
-    100;
-
-
-  let top =
-    rect.top -
-    120;
-
-
-  if (top < 10) {
-
-    top =
-      rect.bottom + 10;
-
-  }
-
-
-  if (
-    left + 210 >
-    window.innerWidth - 10
-  ) {
-
-    left =
-      window.innerWidth - 220;
-
-  }
-
-
-  if (left < 10) {
-    left = 10;
-  }
-
-
-  tooltip.style.left =
-    `${left}px`;
-
-
-  tooltip.style.top =
-    `${top}px`;
-
-}
-
-
-function hideCharacterTooltip() {
-
-  const tooltip =
-    $("#character-tooltip");
-
-
-  if (tooltip) {
-
-    tooltip.style.display =
-      "none";
-
-  }
-
-}
-
-
-function renderCharacterDetails(
-  character,
-  row
-) {
-
-  const panel =
-    $("#character-details");
-
-
-  if (!panel) {
-    return;
-  }
-
-
-  if (!row) {
-
-    panel.innerHTML = `
-
-      <div class="character-selected">
-
-        <div class="selected-character">
-          ${escapeHTML(character)}
-        </div>
-
-        <p>
-          No vocabulary entry was found
-          for this character.
-        </p>
-
-      </div>
-
-    `;
-
-    return;
-
-  }
-
-
-  panel.innerHTML = `
-
-    <div class="character-selected">
-
-      <div class="selected-character">
-        ${escapeHTML(character)}
-      </div>
-
-      ${characterInfoRow(
-        "Simplified",
-        row.Simplified
-      )}
-
-      ${characterInfoRow(
-        "Traditional",
-        row.Traditional
-      )}
-
-      ${characterInfoRow(
-        "Pinyin",
-        row.Pinyin || row.HSK_Pinyin
-      )}
-
-      ${characterInfoRow(
-        "English",
-        row.English
-      )}
-
-      ${characterInfoRow(
-        "CLI English",
-        row.CLI_English
-      )}
-
-      ${characterInfoRow(
-        "HSK Level",
-        row.HSK_Level
-      )}
-
-    </div>
-
-  `;
-
-}
-
-
-function characterInfoRow(
-  label,
-  value
-) {
-
-  value =
-    clean(value);
-
-
-  if (!value) {
-    return "";
-  }
-
-
-  return `
-
-    <div class="character-info-row">
-
-      <strong>
-        ${escapeHTML(label)}
-      </strong>
-
-      ${escapeHTML(value)}
-
-    </div>
-
-  `;
 
 }
 
 
 /* ============================================================
-   TEXT TO SPEECH
+   SPEECH FOR READING
 ============================================================ */
 
 function speakText(text) {
 
+  text =
+    clean(text);
+
+
+  if (!text) {
+    return;
+  }
+
+
   if (
-    !text ||
     !("speechSynthesis" in window)
   ) {
 
@@ -1936,10 +3205,8 @@ function speakText(text) {
       text
     );
 
-
   utterance.lang =
     "zh-CN";
-
 
   utterance.rate =
     0.85;
@@ -1952,52 +3219,140 @@ function speakText(text) {
 }
 
 
-function speakCurrentWord() {
+/* ============================================================
+   GAMES
+============================================================ */
 
-  const row =
-    state.studySet[
-      state.cardIndex
-    ];
+function setupGames() {
 
+  $$(".game-card")
+    .forEach(
+      button => {
 
-  if (row) {
+        button.addEventListener(
+          "click",
+          () => {
 
-    speakText(
-      getWord(row)
+            const game =
+              button.dataset.game;
+
+            startGame(
+              game
+            );
+
+          }
+        );
+
+      }
     );
-
-  }
 
 }
 
 
-function speakReadingSentence() {
+function startGame(game) {
 
-  const row =
-    getCurrentReadingRow();
+  const source =
+    state.filteredVocabulary.length
+      ? state.filteredVocabulary
+      : state.vocabulary;
 
 
-  if (!row) {
+  if (!source.length) {
+
     return;
+
   }
 
 
-  const examples =
-    getAvailableExamples(row);
-
-
-  const example =
-    examples.find(
-      ex =>
-        ex.number ===
-        state.readingExampleNumber
+  state.gameWords =
+    shuffle(
+      source
+    ).slice(
+      0,
+      Math.min(
+        10,
+        source.length
+      )
     );
 
 
-  if (example) {
+  state.currentGame =
+    game;
 
-    speakText(
-      example.chinese
+  state.currentGameIndex =
+    0;
+
+  state.gameScore =
+    0;
+
+
+  const selection =
+    $("#game-selection");
+
+  if (selection) {
+
+    selection.classList.add(
+      "hidden"
+    );
+
+  }
+
+
+  const gameArea =
+    $("#game-area");
+
+  if (gameArea) {
+
+    gameArea.classList.remove(
+      "hidden"
+    );
+
+  }
+
+
+  updateGameScore();
+
+
+  if (
+    game === "multiple-choice"
+  ) {
+
+    startMultipleChoice();
+
+  } else if (
+    game === "english-chinese"
+  ) {
+
+    startEnglishToChinese();
+
+  } else if (
+    game === "scramble"
+  ) {
+
+    startScramble();
+
+  } else if (
+    game === "matching"
+  ) {
+
+    startMatching();
+
+  } else if (
+    game === "sentence"
+  ) {
+
+    startSentenceScramble();
+
+  } else if (
+    game === "listening"
+  ) {
+
+    startListening();
+
+  } else {
+
+    showGameMessage(
+      "Game not recognized."
     );
 
   }
@@ -2006,161 +3361,48 @@ function speakReadingSentence() {
 
 
 /* ============================================================
-   GAMES
+   GAME HELPERS
 ============================================================ */
 
-function setupGames() {
+function updateGameScore() {
 
-  $$(".game-card")
-    .forEach(card => {
+  const score =
+    $("#game-score");
 
-      card.addEventListener(
-        "click",
-        () => {
+  if (score) {
 
-          startGame(
-            card.dataset.game
-          );
+    score.textContent =
+      state.gameScore;
 
-        }
-      );
-
-    });
-
-
-  $("#exit-game")
-    .addEventListener(
-      "click",
-      exitGame
-    );
+  }
 
 }
 
 
-function startGame(gameName) {
+function getGameContainer() {
 
-  const gameSource =
-    state.filteredVocabulary.length
-      ? state.filteredVocabulary
-      : state.vocabulary;
+  return $("#game-content");
+
+}
 
 
-  if (gameSource.length < 4) {
+function showGameMessage(
+  message
+) {
 
-    alert(
-      "At least 4 vocabulary words are needed for games."
-    );
+  const container =
+    getGameContainer();
 
+  if (!container) {
     return;
-
   }
 
 
-  state.currentGame =
-    gameName;
-
-
-  state.gameScore = 0;
-
-  state.gameIndex = 0;
-
-  state.gameAnswered = false;
-
-
-  $("#game-selection")
-    .classList.add("hidden");
-
-
-  $("#game-area")
-    .classList.remove("hidden");
-
-
-  $("#game-score")
-    .textContent =
-    "0";
-
-
-  state.gameWords =
-    shuffle(
-      gameSource
-    ).slice(
-      0,
-      Math.min(
-        10,
-        gameSource.length
-      )
-    );
-
-
-  renderGame();
-
-}
-
-
-function exitGame() {
-
-  state.currentGame =
-    null;
-
-
-  $("#game-area")
-    .classList.add("hidden");
-
-
-  $("#game-selection")
-    .classList.remove("hidden");
-
-}
-
-
-function renderGame() {
-
-  switch (
-    state.currentGame
-  ) {
-
-    case "multiple-choice":
-
-      renderMultipleChoice();
-
-      break;
-
-
-    case "english-chinese":
-
-      renderEnglishChinese();
-
-      break;
-
-
-    case "scramble":
-
-      renderScramble();
-
-      break;
-
-
-    case "matching":
-
-      startMatchingGame();
-
-      break;
-
-
-    case "sentence":
-
-      renderSentenceScramble();
-
-      break;
-
-
-    case "listening":
-
-      renderListeningGame();
-
-      break;
-
-  }
+  container.innerHTML = `
+    <div class="game-complete">
+      ${escapeHTML(message)}
+    </div>
+  `;
 
 }
 
@@ -2169,197 +3411,163 @@ function renderGame() {
    MULTIPLE CHOICE
 ============================================================ */
 
-function renderMultipleChoice() {
+function startMultipleChoice() {
 
-  const row =
+  const container =
+    getGameContainer();
+
+  if (!container) {
+    return;
+  }
+
+
+  const word =
     state.gameWords[
-      state.gameIndex
+      state.currentGameIndex
     ];
 
 
-  if (!row) {
+  if (!word) {
 
-    renderGameComplete();
+    finishGame();
 
     return;
 
   }
-
-
-  state.gameAnswered = false;
-
-
-  const correct =
-    getEnglish(row);
 
 
   const distractors =
     shuffle(
-      state.gameWords.filter(
-        item =>
-          item !== row &&
-          getEnglish(item)
+      state.vocabulary.filter(
+        row =>
+          row !== word
       )
     )
-    .slice(0, 3)
-    .map(
-      item =>
-        getEnglish(item)
+      .slice(
+        0,
+        3
+      );
+
+
+  const choices =
+    shuffle(
+      [
+        word,
+        ...distractors
+      ]
     );
 
 
-  const answers =
-    shuffle([
-      correct,
-      ...distractors
-    ]);
+  container.innerHTML = `
+
+    <div class="game-question">
+      ${escapeHTML(word.Simplified)}
+    </div>
+
+    <p>
+      Choose the English meaning.
+    </p>
+
+    <div class="game-choices">
+
+      ${choices
+        .map(
+          choice =>
+            `
+              <button
+                class="game-choice"
+                data-answer="${escapeAttribute(choice.Simplified)}"
+              >
+                ${escapeHTML(choice.English)}
+              </button>
+            `
+        )
+        .join("")}
+
+    </div>
+
+    <div id="game-feedback"></div>
+
+  `;
 
 
-  $("#game-content")
-    .innerHTML = `
+  $$(".game-choice")
+    .forEach(
+      button => {
 
-      <div class="game-question">
-        What does this word mean?
-      </div>
+        button.addEventListener(
+          "click",
+          () => {
 
-      <div class="game-chinese">
-        ${escapeHTML(
-          getWord(row)
-        )}
-      </div>
-
-      <div class="answer-grid">
-
-        ${answers.map(
-          answer => `
-
-            <button
-              class="answer-button"
-              data-answer="${escapeAttribute(answer)}"
-            >
-              ${escapeHTML(answer)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-      <div
-        id="game-feedback"
-        class="game-feedback hidden"
-      ></div>
-
-    `;
+            const correct =
+              button.dataset.answer ===
+              word.Simplified;
 
 
-  $$(".answer-button")
-    .forEach(button => {
+            if (correct) {
 
-      button.addEventListener(
-        "click",
-        () => {
+              button.classList.add(
+                "correct"
+              );
 
-          handleMultipleChoiceAnswer(
-            button,
-            correct,
-            row
-          );
+              state.gameScore++;
 
-        }
-      );
+            } else {
 
-    });
+              button.classList.add(
+                "incorrect"
+              );
 
-}
+            }
 
 
-function handleMultipleChoiceAnswer(
-  button,
-  correct,
-  row
-) {
-
-  if (state.gameAnswered) {
-    return;
-  }
+            markWordProgress(
+              word,
+              correct
+            );
 
 
-  state.gameAnswered = true;
+            const feedback =
+              $("#game-feedback");
 
 
-  const answer =
-    button.dataset.answer;
+            if (feedback) {
+
+              feedback.textContent =
+                correct
+                  ? "Correct!"
+                  : `Answer: ${word.English}`;
+
+            }
 
 
-  const isCorrect =
-    answer === correct;
+            $$(".game-choice")
+              .forEach(
+                item => {
+                  item.disabled = true;
+                }
+              );
 
 
-  $$(".answer-button")
-    .forEach(btn => {
+            updateGameScore();
 
-      if (
-        btn.dataset.answer ===
-        correct
-      ) {
 
-        btn.classList.add(
-          "correct"
+            setTimeout(
+              () => {
+
+                state.currentGameIndex++;
+
+                startMultipleChoice();
+
+              },
+              900
+            );
+
+          }
         );
 
       }
-
-    });
-
-
-  if (isCorrect) {
-
-    button.classList.add(
-      "correct"
     );
-
-
-    state.gameScore++;
-
-
-    recordStudyResult(
-      row,
-      true
-    );
-
-  } else {
-
-    button.classList.add(
-      "incorrect"
-    );
-
-
-    recordStudyResult(
-      row,
-      false
-    );
-
-  }
-
-
-  $("#game-score")
-    .textContent =
-    state.gameScore;
-
-
-  showGameFeedback(
-    isCorrect,
-    isCorrect
-      ? "Correct!"
-      : `The answer is: ${correct}`
-  );
-
-
-  setTimeout(
-    nextGameQuestion,
-    900
-  );
 
 }
 
@@ -2368,368 +3576,138 @@ function handleMultipleChoiceAnswer(
    ENGLISH → CHINESE
 ============================================================ */
 
-function renderEnglishChinese() {
+function startEnglishToChinese() {
 
-  const row =
-    state.gameWords[
-      state.gameIndex
-    ];
+  const container =
+    getGameContainer();
 
-
-  if (!row) {
-
-    renderGameComplete();
-
+  if (!container) {
     return;
-
   }
-
-
-  state.gameAnswered = false;
-
-
-  const correct =
-    getWord(row);
-
-
-  const distractors =
-    shuffle(
-      state.gameWords.filter(
-        item =>
-          item !== row &&
-          getWord(item)
-      )
-    )
-    .slice(0, 3)
-    .map(
-      item =>
-        getWord(item)
-    );
-
-
-  const answers =
-    shuffle([
-      correct,
-      ...distractors
-    ]);
-
-
-  $("#game-content")
-    .innerHTML = `
-
-      <div class="game-question">
-        Which Chinese word means:
-      </div>
-
-      <div class="game-question">
-        "${escapeHTML(
-          getEnglish(row)
-        )}"
-      </div>
-
-      <div class="answer-grid">
-
-        ${answers.map(
-          answer => `
-
-            <button
-              class="answer-button"
-              data-answer="${escapeAttribute(answer)}"
-            >
-              ${escapeHTML(answer)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-      <div
-        id="game-feedback"
-        class="game-feedback hidden"
-      ></div>
-
-    `;
-
-
-  $$(".answer-button")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (state.gameAnswered) {
-            return;
-          }
-
-
-          state.gameAnswered = true;
-
-
-          const answer =
-            button.dataset.answer;
-
-
-          const isCorrect =
-            answer === correct;
-
-
-          $$(".answer-button")
-            .forEach(btn => {
-
-              if (
-                btn.dataset.answer ===
-                correct
-              ) {
-
-                btn.classList.add(
-                  "correct"
-                );
-
-              }
-
-            });
-
-
-          if (isCorrect) {
-
-            button.classList.add(
-              "correct"
-            );
-
-            state.gameScore++;
-
-          } else {
-
-            button.classList.add(
-              "incorrect"
-            );
-
-          }
-
-
-          recordStudyResult(
-            row,
-            isCorrect
-          );
-
-
-          $("#game-score")
-            .textContent =
-            state.gameScore;
-
-
-          showGameFeedback(
-            isCorrect,
-            isCorrect
-              ? "Correct!"
-              : `The answer is: ${correct}`
-          );
-
-
-          setTimeout(
-            nextGameQuestion,
-            900
-          );
-
-        }
-      );
-
-    });
-
-}
-
-
-/* ============================================================
-   WORD SCRAMBLE
-============================================================ */
-
-function renderScramble() {
-
-  const row =
-    state.gameWords[
-      state.gameIndex
-    ];
-
-
-  if (!row) {
-
-    renderGameComplete();
-
-    return;
-
-  }
-
-
-  state.gameAnswered = false;
 
 
   const word =
-    getWord(row);
+    state.gameWords[
+      state.currentGameIndex
+    ];
 
 
-  if (
-    [...word].length < 2
-  ) {
+  if (!word) {
 
-    state.gameIndex++;
-
-    renderGame();
+    finishGame();
 
     return;
 
   }
 
 
-  const characters =
-    shuffle([
-      ...word
-    ]);
+  container.innerHTML = `
+
+    <div class="game-question">
+      ${escapeHTML(word.English)}
+    </div>
+
+    <p>
+      Type the Chinese word.
+    </p>
+
+    <input
+      id="game-answer"
+      class="game-answer"
+      type="text"
+      autocomplete="off"
+      placeholder="Type the Chinese word"
+    />
+
+    <button
+      id="check-answer"
+      class="primary-button"
+      type="button"
+    >
+      Check
+    </button>
+
+    <div id="game-feedback"></div>
+
+  `;
 
 
-  $("#game-content")
-    .innerHTML = `
+  const input =
+    $("#game-answer");
 
-      <div class="game-question">
-        Build the Chinese word
-      </div>
+  if (input) {
 
-      <div class="game-question">
-        English:
-        <strong>
-          ${escapeHTML(
-            getEnglish(row)
-          )}
-        </strong>
-      </div>
+    input.focus();
 
-      <div
-        id="scramble-answer"
-        class="scramble-answer"
-      >
-        <span>
-          Click characters below
-        </span>
-      </div>
-
-      <div
-        id="scramble-letters"
-        class="scramble-letters"
-      >
-
-        ${characters.map(
-          (char, index) => `
-
-            <button
-              class="scramble-letter"
-              data-index="${index}"
-              data-char="${escapeAttribute(char)}"
-            >
-              ${escapeHTML(char)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-      <button
-        id="scramble-submit"
-        class="primary-button"
-      >
-        Check Answer
-      </button>
-
-      <div
-        id="game-feedback"
-        class="game-feedback hidden"
-      ></div>
-
-    `;
+  }
 
 
-  const selected = [];
-
-
-  $$(".scramble-letter")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (button.disabled) {
-            return;
-          }
-
-
-          button.disabled = true;
-
-
-          selected.push(
-            button.dataset.char
-          );
-
-
-          renderScrambleAnswer(
-            selected
-          );
-
-        }
-      );
-
-    });
-
-
-  $("#scramble-submit")
-    .addEventListener(
+  $("#check-answer")
+    ?.addEventListener(
       "click",
       () => {
 
-        if (state.gameAnswered) {
-          return;
-        }
-
-
-        state.gameAnswered = true;
-
-
         const answer =
-          selected.join("");
+          clean(
+            input?.value
+          );
 
 
-        const isCorrect =
-          answer === word;
+        const correct =
+          answer ===
+          clean(word.Simplified);
 
 
-        if (isCorrect) {
+        if (correct) {
+
           state.gameScore++;
+
         }
 
 
-        recordStudyResult(
-          row,
-          isCorrect
+        markWordProgress(
+          word,
+          correct
         );
 
 
-        $("#game-score")
-          .textContent =
-          state.gameScore;
+        const feedback =
+          $("#game-feedback");
 
 
-        showGameFeedback(
-          isCorrect,
-          isCorrect
-            ? "Correct!"
-            : `Correct word: ${word}`
-        );
+        if (feedback) {
+
+          feedback.textContent =
+            correct
+              ? "Correct!"
+              : `Answer: ${word.Simplified}`;
+
+        }
+
+
+        updateGameScore();
+
+
+        const button =
+          $("#check-answer");
+
+        if (button) {
+
+          button.disabled =
+            true;
+
+        }
 
 
         setTimeout(
-          nextGameQuestion,
-          1200
+          () => {
+
+            state.currentGameIndex++;
+
+            startEnglishToChinese();
+
+          },
+          1000
         );
 
       }
@@ -2738,29 +3716,385 @@ function renderScramble() {
 }
 
 
-function renderScrambleAnswer(
-  characters
-) {
+/* ============================================================
+   SCRAMBLE
+============================================================ */
+
+function startScramble() {
 
   const container =
-    $("#scramble-answer");
+    getGameContainer();
+
+  if (!container) {
+    return;
+  }
 
 
-  if (!characters.length) {
+  const word =
+    state.gameWords[
+      state.currentGameIndex
+    ];
 
-    container.innerHTML =
-      "<span>Click characters below</span>";
+
+  if (!word) {
+
+    finishGame();
 
     return;
 
   }
 
 
-  container.innerHTML =
-    characters.map(
-      char =>
-        `<span class="word-tile">${escapeHTML(char)}</span>`
-    ).join("");
+  const characters =
+    shuffle(
+      Array.from(
+        clean(
+          word.Simplified
+        )
+      )
+    );
+
+
+  container.innerHTML = `
+
+    <div class="game-question">
+      Unscramble the Chinese word.
+    </div>
+
+    <div class="scramble-word">
+      ${escapeHTML(
+        characters.join(" ")
+      )}
+    </div>
+
+    <input
+      id="game-answer"
+      class="game-answer"
+      type="text"
+      autocomplete="off"
+      placeholder="Type the word"
+    />
+
+    <button
+      id="check-answer"
+      class="primary-button"
+      type="button"
+    >
+      Check
+    </button>
+
+    <div id="game-feedback"></div>
+
+  `;
+
+
+  const input =
+    $("#game-answer");
+
+
+  if (input) {
+    input.focus();
+  }
+
+
+  $("#check-answer")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        const answer =
+          clean(
+            input?.value
+          );
+
+
+        const correct =
+          answer ===
+          clean(
+            word.Simplified
+          );
+
+
+        if (correct) {
+
+          state.gameScore++;
+
+        }
+
+
+        markWordProgress(
+          word,
+          correct
+        );
+
+
+        const feedback =
+          $("#game-feedback");
+
+
+        if (feedback) {
+
+          feedback.textContent =
+            correct
+              ? "Correct!"
+              : `Answer: ${word.Simplified}`;
+
+        }
+
+
+        updateGameScore();
+
+
+        setTimeout(
+          () => {
+
+            state.currentGameIndex++;
+
+            startScramble();
+
+          },
+          1000
+        );
+
+      }
+    );
+
+}
+
+
+/* ============================================================
+   MATCHING
+============================================================ */
+
+function startMatching() {
+
+  const container =
+    getGameContainer();
+
+  if (!container) {
+    return;
+  }
+
+
+  const words =
+    state.gameWords.slice(
+      0,
+      Math.min(
+        6,
+        state.gameWords.length
+      )
+    );
+
+
+  state.matchingMatches =
+    0;
+
+  state.matchingSelected =
+    null;
+
+
+  if (!words.length) {
+
+    showGameMessage(
+      "Not enough words for matching."
+    );
+
+    return;
+
+  }
+
+
+  const cards = [
+    ...words.map(
+      word => ({
+        type: "chinese",
+        value: word.Simplified,
+        word
+      })
+    ),
+    ...words.map(
+      word => ({
+        type: "english",
+        value: word.English,
+        word
+      })
+    )
+  ];
+
+
+  const shuffledCards =
+    shuffle(cards);
+
+
+  container.innerHTML = `
+
+    <p>
+      Match each Chinese word with its English meaning.
+    </p>
+
+    <div class="matching-grid">
+
+      ${shuffledCards
+        .map(
+          (card, index) =>
+            `
+              <button
+                class="matching-card"
+                data-index="${index}"
+              >
+                ${escapeHTML(card.value)}
+              </button>
+            `
+        )
+        .join("")}
+
+    </div>
+
+  `;
+
+
+  $$(".matching-card")
+    .forEach(
+      (element, index) => {
+
+        element.addEventListener(
+          "click",
+          () => {
+
+            const card =
+              shuffledCards[index];
+
+
+            if (
+              element.classList.contains(
+                "matched"
+              )
+            ) {
+
+              return;
+
+            }
+
+
+            if (
+              !state.matchingSelected
+            ) {
+
+              state.matchingSelected = {
+                element,
+                card
+              };
+
+
+              element.classList.add(
+                "selected"
+              );
+
+
+              return;
+
+            }
+
+
+            const first =
+              state.matchingSelected;
+
+
+            if (
+              first.card.word ===
+                card.word &&
+              first.card.type !==
+                card.type
+            ) {
+
+              first.element.classList.add(
+                "matched"
+              );
+
+              element.classList.add(
+                "matched"
+              );
+
+
+              state.matchingMatches++;
+
+
+              markWordProgress(
+                card.word,
+                true
+              );
+
+
+              state.gameScore++;
+
+
+              updateGameScore();
+
+
+              if (
+                state.matchingMatches ===
+                words.length
+              ) {
+
+                setTimeout(
+                  () => {
+
+                    finishGame();
+
+                  },
+                  500
+                );
+
+              }
+
+            } else {
+
+              first.element.classList.add(
+                "incorrect"
+              );
+
+              element.classList.add(
+                "incorrect"
+              );
+
+
+              markWordProgress(
+                card.word,
+                false
+              );
+
+
+              setTimeout(
+                () => {
+
+                  first.element.classList.remove(
+                    "incorrect"
+                  );
+
+                  element.classList.remove(
+                    "incorrect"
+                  );
+
+                },
+                500
+              );
+
+            }
+
+
+            first.element.classList.remove(
+              "selected"
+            );
+
+
+            state.matchingSelected =
+              null;
+
+          }
+        );
+
+      }
+    );
 
 }
 
@@ -2769,226 +4103,174 @@ function renderScrambleAnswer(
    SENTENCE SCRAMBLE
 ============================================================ */
 
-function renderSentenceScramble() {
+function startSentenceScramble() {
+
+  const container =
+    getGameContainer();
+
+  if (!container) {
+    return;
+  }
+
 
   const candidates =
-    state.gameWords.filter(row => {
+    state.gameWords
+      .map(
+        row => {
 
-      return getAvailableExamples(row)
-        .some(
-          ex =>
-            ex.chinese &&
-            ex.chinese.length > 3
-        );
+          const examples =
+            getAvailableExamples(
+              row
+            );
 
-    });
+
+          return {
+            row,
+            example:
+              examples[0]
+          };
+
+        }
+      )
+      .filter(
+        item =>
+          item.example &&
+          item.example.chinese
+      );
 
 
   if (!candidates.length) {
 
-    $("#game-content")
-      .innerHTML = `
-
-        <div class="game-question">
-          No suitable example sentences
-          were found for this game.
-        </div>
-
-        <button
-          id="sentence-back-button"
-          class="primary-button"
-        >
-          Back to Games
-        </button>
-
-      `;
-
-
-    $("#sentence-back-button")
-      .addEventListener(
-        "click",
-        exitGame
-      );
-
+    showGameMessage(
+      "No example sentences are available for this game."
+    );
 
     return;
 
   }
 
 
-  const row =
+  const selected =
     candidates[
-      state.gameIndex %
-      candidates.length
-    ];
-
-
-  const examples =
-    getAvailableExamples(row)
-      .filter(
-        ex =>
-          ex.chinese.length > 3
-      );
-
-
-  const example =
-    examples[
       Math.floor(
         Math.random() *
-        examples.length
+        candidates.length
       )
     ];
 
 
-  const cleanedSentence =
-    example.chinese;
-
+  /*
+    Chinese sentences usually do not have spaces
+    between words, so this game works character-by-character.
+  */
 
   const characters =
-    shuffle([
-      ...cleanedSentence
-    ]);
+    shuffle(
+      Array.from(
+        clean(
+          selected.example.chinese
+        )
+      )
+    );
 
 
-  state.gameAnswered = false;
+  container.innerHTML = `
+
+    <div class="game-question">
+      Put the sentence in the correct order.
+    </div>
+
+    <div class="scramble-word">
+      ${escapeHTML(
+        characters.join(" / ")
+      )}
+    </div>
+
+    <input
+      id="game-answer"
+      class="game-answer"
+      type="text"
+      autocomplete="off"
+      placeholder="Type the complete sentence"
+    />
+
+    <button
+      id="check-answer"
+      class="primary-button"
+      type="button"
+    >
+      Check
+    </button>
+
+    <div id="game-feedback"></div>
+
+  `;
 
 
-  $("#game-content")
-    .innerHTML = `
-
-      <div class="game-question">
-        Put the sentence in the correct order.
-      </div>
-
-      <div>
-        English:
-        <strong>
-          ${escapeHTML(
-            example.english
-          )}
-        </strong>
-      </div>
-
-      <div
-        id="sentence-answer"
-        class="scramble-answer"
-      >
-      </div>
-
-      <div class="sentence-tiles">
-
-        ${characters.map(
-          (char, index) => `
-
-            <button
-              class="sentence-tile"
-              data-index="${index}"
-              data-char="${escapeAttribute(char)}"
-            >
-              ${escapeHTML(char)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-      <button
-        id="sentence-submit"
-        class="primary-button"
-      >
-        Check Sentence
-      </button>
-
-      <div
-        id="game-feedback"
-        class="game-feedback hidden"
-      ></div>
-
-    `;
+  const input =
+    $("#game-answer");
 
 
-  const selected = [];
+  if (input) {
+    input.focus();
+  }
 
 
-  $$(".sentence-tile")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (button.disabled) {
-            return;
-          }
-
-
-          button.disabled = true;
-
-
-          selected.push(
-            button.dataset.char
-          );
-
-
-          $("#sentence-answer")
-            .textContent =
-            selected.join("");
-
-        }
-      );
-
-    });
-
-
-  $("#sentence-submit")
-    .addEventListener(
+  $("#check-answer")
+    ?.addEventListener(
       "click",
       () => {
 
-        if (state.gameAnswered) {
-          return;
-        }
-
-
-        state.gameAnswered = true;
-
-
         const answer =
-          selected.join("");
+          clean(
+            input?.value
+          );
 
 
-        const isCorrect =
-          answer === cleanedSentence;
+        const correct =
+          answer ===
+          clean(
+            selected.example.chinese
+          );
 
 
-        if (isCorrect) {
+        if (correct) {
+
           state.gameScore++;
+
         }
 
 
-        recordStudyResult(
-          row,
-          isCorrect
+        markWordProgress(
+          selected.row,
+          correct
         );
 
 
-        $("#game-score")
-          .textContent =
-          state.gameScore;
+        const feedback =
+          $("#game-feedback");
 
 
-        showGameFeedback(
-          isCorrect,
-          isCorrect
-            ? "Correct!"
-            : `Correct sentence: ${cleanedSentence}`
-        );
+        if (feedback) {
+
+          feedback.textContent =
+            correct
+              ? "Correct!"
+              : `Answer: ${selected.example.chinese}`;
+
+        }
+
+
+        updateGameScore();
 
 
         setTimeout(
-          nextGameQuestion,
-          1300
+          () => {
+
+            finishGame();
+
+          },
+          1000
         );
 
       }
@@ -2998,637 +4280,197 @@ function renderSentenceScramble() {
 
 
 /* ============================================================
-   LISTENING GAME
+   LISTENING
 ============================================================ */
 
-function renderListeningGame() {
+function startListening() {
 
-  const row =
+  const container =
+    getGameContainer();
+
+  if (!container) {
+    return;
+  }
+
+
+  const word =
     state.gameWords[
-      state.gameIndex
+      state.currentGameIndex
     ];
 
 
-  if (!row) {
+  if (!word) {
 
-    renderGameComplete();
+    finishGame();
 
     return;
 
   }
 
 
-  state.gameAnswered = false;
+  container.innerHTML = `
+
+    <div class="game-question">
+      Listen and type what you hear.
+    </div>
+
+    <button
+      id="play-word"
+      class="primary-button"
+      type="button"
+    >
+      🔊 Play Chinese
+    </button>
+
+    <input
+      id="game-answer"
+      class="game-answer"
+      type="text"
+      autocomplete="off"
+      placeholder="Type what you hear"
+    />
+
+    <button
+      id="check-answer"
+      class="primary-button"
+      type="button"
+    >
+      Check
+    </button>
+
+    <div id="game-feedback"></div>
+
+  `;
 
 
-  const correct =
-    getWord(row);
-
-
-  const distractors =
-    shuffle(
-      state.gameWords.filter(
-        item =>
-          item !== row &&
-          getWord(item)
-      )
-    )
-    .slice(0, 3)
-    .map(
-      item =>
-        getWord(item)
-    );
-
-
-  const answers =
-    shuffle([
-      correct,
-      ...distractors
-    ]);
-
-
-  $("#game-content")
-    .innerHTML = `
-
-      <div class="game-question">
-        What Chinese word did you hear?
-      </div>
-
-      <button
-        id="listen-button"
-        class="primary-button large-button"
-      >
-        🔊 Play Word
-      </button>
-
-      <div
-        class="answer-grid"
-        style="margin-top:25px"
-      >
-
-        ${answers.map(
-          answer => `
-
-            <button
-              class="answer-button"
-              data-answer="${escapeAttribute(answer)}"
-            >
-              ${escapeHTML(answer)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-      <div
-        id="game-feedback"
-        class="game-feedback hidden"
-      ></div>
-
-    `;
-
-
-  $("#listen-button")
-    .addEventListener(
+  $("#play-word")
+    ?.addEventListener(
       "click",
-      () => speakText(correct)
-    );
-
-
-  setTimeout(
-    () => speakText(correct),
-    300
-  );
-
-
-  $$(".answer-button")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (state.gameAnswered) {
-            return;
-          }
-
-
-          state.gameAnswered = true;
-
-
-          const isCorrect =
-            button.dataset.answer ===
-            correct;
-
-
-          if (isCorrect) {
-
-            button.classList.add(
-              "correct"
-            );
-
-
-            state.gameScore++;
-
-          } else {
-
-            button.classList.add(
-              "incorrect"
-            );
-
-          }
-
-
-          $$(".answer-button")
-            .forEach(btn => {
-
-              if (
-                btn.dataset.answer ===
-                correct
-              ) {
-
-                btn.classList.add(
-                  "correct"
-                );
-
-              }
-
-            });
-
-
-          recordStudyResult(
-            row,
-            isCorrect
-          );
-
-
-          $("#game-score")
-            .textContent =
-            state.gameScore;
-
-
-          showGameFeedback(
-            isCorrect,
-            isCorrect
-              ? "Correct!"
-              : `The answer is: ${correct}`
-          );
-
-
-          setTimeout(
-            nextGameQuestion,
-            1000
-          );
-
-        }
-      );
-
-    });
-
-}
-
-
-/* ============================================================
-   MATCHING GAME
-============================================================ */
-
-function startMatchingGame() {
-
-  const gameSource =
-    state.filteredVocabulary.length
-      ? state.filteredVocabulary
-      : state.vocabulary;
-
-
-  const words =
-    shuffle(
-      gameSource
-    ).slice(
-      0,
-      6
-    );
-
-
-  state.matchingCards = [];
-
-
-  words.forEach((row, index) => {
-
-    state.matchingCards.push({
-
-      id: `${index}-cn`,
-
-      pair: index,
-
-      text: getWord(row),
-
-      type: "chinese",
-
-      row
-
-    });
-
-
-    state.matchingCards.push({
-
-      id: `${index}-en`,
-
-      pair: index,
-
-      text: getEnglish(row),
-
-      type: "english",
-
-      row
-
-    });
-
-  });
-
-
-  state.matchingCards =
-    shuffle(
-      state.matchingCards
-    );
-
-
-  state.matchingFirst = null;
-
-  state.matchingSecond = null;
-
-  state.matchingMatches = 0;
-
-
-  renderMatchingGame();
-
-}
-
-
-function renderMatchingGame() {
-
-  $("#game-content")
-    .innerHTML = `
-
-      <div class="game-question">
-        Match each Chinese word
-        with its English meaning.
-      </div>
-
-      <div
-        id="matching-grid"
-        class="matching-grid"
-      >
-
-        ${state.matchingCards.map(
-          card => `
-
-            <button
-              class="match-card hidden-card"
-              data-id="${escapeAttribute(card.id)}"
-            >
-              ${escapeHTML(card.text)}
-            </button>
-
-          `
-        ).join("")}
-
-      </div>
-
-    `;
-
-
-  $$(".match-card")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          handleMatchingClick(
-            button
-          );
-
-        }
-      );
-
-    });
-
-}
-
-
-function handleMatchingClick(
-  button
-) {
-
-  if (
-    state.matchingFirst &&
-    state.matchingSecond
-  ) {
-    return;
-  }
-
-
-  const id =
-    button.dataset.id;
-
-
-  const card =
-    state.matchingCards.find(
-      item =>
-        item.id === id
-    );
-
-
-  if (!card) {
-    return;
-  }
-
-
-  if (
-    state.matchingFirst &&
-    state.matchingFirst.id === id
-  ) {
-
-    return;
-
-  }
-
-
-  button.classList.remove(
-    "hidden-card"
-  );
-
-
-  button.classList.add(
-    "revealed"
-  );
-
-
-  if (!state.matchingFirst) {
-
-    state.matchingFirst = {
-
-      ...card,
-
-      element: button
-
-    };
-
-
-    return;
-
-  }
-
-
-  state.matchingSecond = {
-
-    ...card,
-
-    element: button
-
-  };
-
-
-  const first =
-    state.matchingFirst;
-
-  const second =
-    state.matchingSecond;
-
-
-  const isMatch =
-    first.pair ===
-    second.pair;
-
-
-  if (isMatch) {
-
-    state.matchingMatches++;
-
-    state.gameScore++;
-
-
-    first.element.style.visibility =
-      "hidden";
-
-
-    second.element.style.visibility =
-      "hidden";
-
-
-    recordStudyResult(
-      first.row,
-      true
-    );
-
-
-    /*
-      Both cards represent the same
-      vocabulary word, so both should
-      receive credit.
-    */
-
-    if (second.row !== first.row) {
-
-      recordStudyResult(
-        second.row,
-        true
-      );
-
-    }
-
-
-    $("#game-score")
-      .textContent =
-      state.gameScore;
-
-
-    state.matchingFirst = null;
-
-    state.matchingSecond = null;
-
-
-    if (
-      state.matchingMatches ===
-      6
-    ) {
-
-      setTimeout(
-        renderGameComplete,
-        500
-      );
-
-    }
-
-  } else {
-
-    recordStudyResult(
-      first.row,
-      false
-    );
-
-
-    if (second.row !== first.row) {
-
-      recordStudyResult(
-        second.row,
-        false
-      );
-
-    }
-
-
-    setTimeout(
       () => {
 
-        first.element
-          .classList.add(
-            "hidden-card"
-          );
+        speakChinese(
+          word
+        );
 
-
-        second.element
-          .classList.add(
-            "hidden-card"
-          );
-
-
-        first.element
-          .classList.remove(
-            "revealed"
-          );
-
-
-        second.element
-          .classList.remove(
-            "revealed"
-          );
-
-
-        state.matchingFirst = null;
-
-        state.matchingSecond = null;
-
-      },
-      700
+      }
     );
 
-  }
+
+  $("#check-answer")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        const answer =
+          clean(
+            $("#game-answer")?.value
+          );
+
+
+        const correct =
+          answer ===
+          clean(
+            word.Simplified
+          );
+
+
+        if (correct) {
+
+          state.gameScore++;
+
+        }
+
+
+        markWordProgress(
+          word,
+          correct
+        );
+
+
+        const feedback =
+          $("#game-feedback");
+
+
+        if (feedback) {
+
+          feedback.textContent =
+            correct
+              ? "Correct!"
+              : `Answer: ${word.Simplified}`;
+
+        }
+
+
+        updateGameScore();
+
+
+        setTimeout(
+          () => {
+
+            state.currentGameIndex++;
+
+            startListening();
+
+          },
+          1000
+        );
+
+      }
+    );
 
 }
 
 
 /* ============================================================
-   GAME UTILITIES
+   GAME FINISH
 ============================================================ */
 
-function nextGameQuestion() {
+function finishGame() {
 
-  state.gameIndex++;
+  const container =
+    getGameContainer();
 
-
-  if (
-    state.gameIndex >=
-    state.gameWords.length
-  ) {
-
-    renderGameComplete();
-
-    return;
-
-  }
-
-
-  renderGame();
-
-}
-
-
-function showGameFeedback(
-  correct,
-  message
-) {
-
-  const element =
-    $("#game-feedback");
-
-
-  if (!element) {
+  if (!container) {
     return;
   }
 
 
-  element.classList.remove(
-    "hidden"
-  );
+  container.innerHTML = `
 
+    <div class="game-complete">
 
-  element.classList.toggle(
-    "correct",
-    correct
-  );
-
-
-  element.classList.toggle(
-    "incorrect",
-    !correct
-  );
-
-
-  element.textContent =
-    message;
-
-}
-
-
-function renderGameComplete() {
-
-  const total =
-    state.gameWords.length;
-
-
-  const percentage =
-    total
-      ? Math.round(
-          (state.gameScore / total) *
-          100
-        )
-      : 0;
-
-
-  $("#game-content")
-    .innerHTML = `
-
-      <div class="game-question">
-        🎉 Game Complete!
-      </div>
-
-      <div class="game-chinese">
-        ${state.gameScore}
-        /
-        ${total}
-      </div>
+      <h3>Great job!</h3>
 
       <p>
-        You scored
+        Your score:
         <strong>
-          ${percentage}%
+          ${state.gameScore}
         </strong>
       </p>
 
       <button
         id="play-again"
         class="primary-button"
+        type="button"
       >
         Play Again
       </button>
 
-    `;
+      <button
+        id="return-games"
+        class="secondary-button"
+        type="button"
+      >
+        Back to Games
+      </button>
+
+    </div>
+
+  `;
 
 
   $("#play-again")
-    .addEventListener(
+    ?.addEventListener(
       "click",
       () => {
 
@@ -3640,686 +4482,44 @@ function renderGameComplete() {
     );
 
 
-  updateAllStatistics();
-
-}
-
-
-/* ============================================================
-   PROGRESS SYSTEM
-============================================================ */
-
-function loadProgress() {
-
-  try {
-
-    const saved =
-      localStorage.getItem(
-        STORAGE_KEY
-      );
-
-
-    if (saved) {
-
-      state.progress =
-        JSON.parse(saved);
-
-    } else {
-
-      state.progress = {};
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Could not load progress",
-      error
-    );
-
-
-    state.progress = {};
-
-  }
-
-}
-
-
-function saveProgress() {
-
-  try {
-
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(
-        state.progress
-      )
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Could not save progress",
-      error
-    );
-
-  }
-
-}
-
-
-function getProgressKey(row) {
-
-  return (
-    getWord(row) ||
-    clean(row.Traditional) ||
-    clean(row.Pinyin)
-  );
-
-}
-
-
-function getWordProgress(row) {
-
-  const key =
-    getProgressKey(row);
-
-
-  if (!state.progress[key]) {
-
-    state.progress[key] = {
-
-      correct: 0,
-
-      incorrect: 0,
-
-      lastStudied: null
-
-    };
-
-  }
-
-
-  return state.progress[key];
-
-}
-
-
-function recordStudyResult(
-  row,
-  result
-) {
-
-  if (!row) {
-    return;
-  }
-
-
-  /*
-    null means the card was viewed
-    but not answered.
-  */
-
-  if (
-    result !== true &&
-    result !== false
-  ) {
-
-    return;
-
-  }
-
-
-  const progress =
-    getWordProgress(row);
-
-
-  if (result) {
-
-    progress.correct++;
-
-  } else {
-
-    progress.incorrect++;
-
-  }
-
-
-  progress.lastStudied =
-    new Date().toISOString();
-
-
-  saveProgress();
-
-  updateAllStatistics();
-
-}
-
-
-function getMasteryPercentage(row) {
-
-  const progress =
-    getWordProgress(row);
-
-
-  const total =
-    progress.correct +
-    progress.incorrect;
-
-
-  if (!total) {
-    return 0;
-  }
-
-
-  return Math.round(
-    (progress.correct / total) *
-    100
-  );
-
-}
-
-
-function getMasteryStatus(row) {
-
-  const progress =
-    getWordProgress(row);
-
-
-  const total =
-    progress.correct +
-    progress.incorrect;
-
-
-  if (!total) {
-    return "New";
-  }
-
-
-  const accuracy =
-    getMasteryPercentage(row);
-
-
-  if (
-    total >= 5 &&
-    accuracy >= 80
-  ) {
-
-    return "Mastered";
-
-  }
-
-
-  return "Learning";
-
-}
-
-
-/* ============================================================
-   PROGRESS UI
-============================================================ */
-
-function setupProgress() {
-
-  $("#reset-progress")
-    .addEventListener(
+  $("#return-games")
+    ?.addEventListener(
       "click",
-      resetProgress
+      () => {
+
+        const gameArea =
+          $("#game-area");
+
+        if (gameArea) {
+
+          gameArea.classList.add(
+            "hidden"
+          );
+
+        }
+
+
+        const selection =
+          $("#game-selection");
+
+        if (selection) {
+
+          selection.classList.remove(
+            "hidden"
+          );
+
+        }
+
+      }
     );
-
-
-  $("#review-incorrect")
-    .addEventListener(
-      "click",
-      reviewIncorrectWords
-    );
-
-}
-
-
-function getProgressStats() {
-
-  let practiced = 0;
-
-  let mastered = 0;
-
-  let needsReview = 0;
-
-  let correct = 0;
-
-  let incorrect = 0;
-
-
-  state.vocabulary.forEach(row => {
-
-    const progress =
-      getWordProgress(row);
-
-
-    const total =
-      progress.correct +
-      progress.incorrect;
-
-
-    if (total > 0) {
-      practiced++;
-    }
-
-
-    if (
-      getMasteryStatus(row) ===
-      "Mastered"
-    ) {
-
-      mastered++;
-
-    }
-
-
-    if (
-      progress.incorrect >
-      progress.correct
-    ) {
-
-      needsReview++;
-
-    }
-
-
-    correct +=
-      progress.correct;
-
-
-    incorrect +=
-      progress.incorrect;
-
-  });
-
-
-  const attempts =
-    correct + incorrect;
-
-
-  const accuracy =
-    attempts
-      ? Math.round(
-          (correct / attempts) *
-          100
-        )
-      : 0;
-
-
-  return {
-
-    practiced,
-
-    mastered,
-
-    needsReview,
-
-    accuracy,
-
-    correct,
-
-    incorrect
-
-  };
-
-}
-
-
-function updateAllStatistics() {
-
-  if (!state.vocabulary.length) {
-    return;
-  }
-
-
-  const stats =
-    getProgressStats();
-
-
-  const homeTotal =
-    $("#home-total-words");
-
-  const homeMastered =
-    $("#home-mastered");
-
-  const homeReview =
-    $("#home-review");
-
-  const homeAccuracy =
-    $("#home-accuracy");
-
-
-  if (homeTotal) {
-    homeTotal.textContent =
-      state.vocabulary.length;
-  }
-
-
-  if (homeMastered) {
-    homeMastered.textContent =
-      stats.mastered;
-  }
-
-
-  if (homeReview) {
-    homeReview.textContent =
-      stats.needsReview;
-  }
-
-
-  if (homeAccuracy) {
-    homeAccuracy.textContent =
-      `${stats.accuracy}%`;
-  }
-
-
-  const progressTotal =
-    $("#progress-total");
-
-  const progressMastered =
-    $("#progress-mastered");
-
-  const progressReview =
-    $("#progress-review");
-
-  const progressAccuracy =
-    $("#progress-accuracy");
-
-
-  if (progressTotal) {
-    progressTotal.textContent =
-      stats.practiced;
-  }
-
-
-  if (progressMastered) {
-    progressMastered.textContent =
-      stats.mastered;
-  }
-
-
-  if (progressReview) {
-    progressReview.textContent =
-      stats.needsReview;
-  }
-
-
-  if (progressAccuracy) {
-    progressAccuracy.textContent =
-      `${stats.accuracy}%`;
-  }
-
-}
-
-
-function renderProgress() {
-
-  updateAllStatistics();
-
-
-  const container =
-    $("#progress-list");
-
-
-  if (!container) {
-    return;
-  }
-
-
-  const rows =
-    [...state.vocabulary]
-      .sort(
-        (a, b) =>
-          getMasteryPercentage(a) -
-          getMasteryPercentage(b)
-      );
-
-
-  container.innerHTML = "";
-
-
-  rows.forEach(row => {
-
-    const progress =
-      getWordProgress(row);
-
-
-    const mastery =
-      getMasteryPercentage(row);
-
-
-    const status =
-      getMasteryStatus(row);
-
-
-    const element =
-      document.createElement("div");
-
-
-    element.className =
-      "progress-row";
-
-
-    const statusClass =
-      status === "Mastered"
-        ? "mastery-mastered"
-        : status === "Learning"
-          ? "mastery-learning"
-          : "mastery-new";
-
-
-    element.innerHTML = `
-
-      <div class="progress-word">
-        ${escapeHTML(
-          getWord(row)
-        )}
-      </div>
-
-      <div class="progress-english">
-        ${escapeHTML(
-          getEnglish(row)
-        )}
-      </div>
-
-      <div>
-
-        <div class="progress-bar-container">
-
-          <div
-            class="progress-bar"
-            style="width:${mastery}%"
-          ></div>
-
-        </div>
-
-        <small>
-          ${progress.correct}
-          correct /
-          ${progress.incorrect}
-          incorrect
-        </small>
-
-      </div>
-
-      <span
-        class="mastery-badge ${statusClass}"
-      >
-        ${status}
-      </span>
-
-    `;
-
-
-    container.appendChild(
-      element
-    );
-
-  });
-
-}
-
-
-function reviewIncorrectWords() {
-
-  const incorrectWords =
-    state.vocabulary.filter(row => {
-
-      const progress =
-        getWordProgress(row);
-
-
-      return (
-        progress.incorrect >
-        progress.correct
-      );
-
-    });
-
-
-  if (!incorrectWords.length) {
-
-    alert(
-      "You currently have no words that need review."
-    );
-
-    return;
-
-  }
-
-
-  state.studySet =
-    shuffle(
-      incorrectWords
-    );
-
-
-  state.cardIndex = 0;
-
-  state.cardFlipped = false;
-
-  renderFlashcard();
-
-  showView("flashcards");
-
-}
-
-
-function resetProgress() {
-
-  const confirmed =
-    confirm(
-      "Reset all vocabulary progress? This cannot be undone."
-    );
-
-
-  if (!confirmed) {
-    return;
-  }
-
-
-  state.progress = {};
-
-  saveProgress();
-
-  updateAllStatistics();
-
-  renderProgress();
 
 }
 
 
 /* ============================================================
-   WORD COUNT
+   INITIAL SETUP
 ============================================================ */
 
-function updateWordCount() {
-
-  const count =
-    state.filteredVocabulary.length;
-
-
-  const total =
-    state.vocabulary.length;
-
-
-  const element =
-    $("#word-count");
-
-
-  if (element) {
-
-    element.textContent =
-      `${count} of ${total} words available`;
-
-  }
-
-}
-
-
-/* ============================================================
-   SECURITY / HTML HELPERS
-============================================================ */
-
-function escapeHTML(value) {
-
-  return String(
-    value ?? ""
-  )
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
-
-}
-
-
-function escapeAttribute(value) {
-
-  return escapeHTML(value);
-
-}
-
-
-/* ============================================================
-   EVENT LISTENERS
-============================================================ */
-
-const reloadButton =
-  $("#reload-button");
-
-
-if (reloadButton) {
-
-  reloadButton.addEventListener(
-    "click",
-    loadVocabulary
-  );
-
-}
-
-
-/* ============================================================
-   START APPLICATION
-============================================================ */
+setupReloadButton();
 
 loadVocabulary();

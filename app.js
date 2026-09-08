@@ -9,7 +9,7 @@
    CONFIGURATION
 ============================================================ */
 
-const EXCEL_FILE = "data/WM_level1_all_with_HSK.xlsx";
+const EXCEL_FILE = "WM_level1_all_with_HSK.xlsx";
 
 //WM_level1_all_with_HSK.xlsx
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
 
@@ -12,41 +13,53 @@
 
   <meta
     name="description"
-    content="Chinese vocabulary flashcards, reading practice, games, and progress tracking."
+    content="Chinese vocabulary flashcards, reading practice, class reading, games, and progress tracking."
   />
 
   <link rel="stylesheet" href="style.css" />
 </head>
 
+
 <body>
 
   <div id="app">
 
-    <!-- ============================= -->
+
+    <!-- ========================================================= -->
     <!-- HEADER -->
-    <!-- ============================= -->
+    <!-- ========================================================= -->
 
     <header class="app-header">
 
       <div class="brand">
-        <div class="brand-chinese">中文</div>
+
+        <div class="brand-chinese">
+          中文
+        </div>
 
         <div>
           <h1>Chinese Study</h1>
-          <p>Vocabulary • Reading • Games</p>
+          <p>Vocabulary • Reading • Class Reading • Games</p>
         </div>
+
       </div>
 
+
       <div class="header-status">
-        <span id="word-count">Loading vocabulary...</span>
+
+        <span id="word-count">
+          Loading vocabulary...
+        </span>
+
       </div>
 
     </header>
 
 
-    <!-- ============================= -->
+
+    <!-- ========================================================= -->
     <!-- NAVIGATION -->
-    <!-- ============================= -->
+    <!-- ========================================================= -->
 
     <nav class="main-nav">
 
@@ -57,6 +70,7 @@
         🏠 Home
       </button>
 
+
       <button
         class="nav-button"
         data-view="flashcards"
@@ -64,12 +78,22 @@
         🃏 Flashcards
       </button>
 
-      <button
+
+      <!-- <button
         class="nav-button"
         data-view="reading"
       >
         📖 Reading
+      </button> -->
+
+
+      <button
+        class="nav-button"
+        data-view="class-reading"
+      >
+        📚 Class Reading
       </button>
+
 
       <button
         class="nav-button"
@@ -77,6 +101,7 @@
       >
         🎮 Games
       </button>
+
 
       <button
         class="nav-button"
@@ -88,36 +113,49 @@
     </nav>
 
 
-    <!-- ============================= -->
+
+    <!-- ========================================================= -->
     <!-- MAIN CONTENT -->
-    <!-- ============================= -->
+    <!-- ========================================================= -->
 
     <main class="main-container">
 
 
-      <!-- ========================================= -->
-      <!-- LOADING / ERROR -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
+      <!-- LOADING MESSAGE -->
+      <!-- ======================================================= -->
 
       <div
         id="loading-message"
         class="message-panel"
       >
+
         <div class="loading-spinner"></div>
 
-        <h2>Loading vocabulary...</h2>
+        <h2>
+          Loading vocabulary...
+        </h2>
 
         <p>
           Please wait while the Excel vocabulary file is loaded.
         </p>
+
       </div>
 
+
+
+      <!-- ======================================================= -->
+      <!-- ERROR MESSAGE -->
+      <!-- ======================================================= -->
 
       <div
         id="error-message"
         class="message-panel error hidden"
       >
-        <h2>Could not load vocabulary</h2>
+
+        <h2>
+          Could not load vocabulary
+        </h2>
 
         <p id="error-text">
           There was a problem loading the Excel file.
@@ -129,12 +167,14 @@
         >
           Try Again
         </button>
+
       </div>
 
 
-      <!-- ========================================= -->
+
+      <!-- ======================================================= -->
       <!-- HOME -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
 
       <section
         id="view-home"
@@ -149,15 +189,19 @@
               中文学习
             </span>
 
+
             <h2>
               Learn Chinese vocabulary
               <span>one word at a time.</span>
             </h2>
 
+
             <p>
               Study vocabulary, practice reading sentences,
-              play games, and track your progress.
+              explore class reading examples, play games,
+              and track your progress.
             </p>
+
 
             <button
               id="home-start-button"
@@ -168,6 +212,7 @@
 
           </div>
 
+
           <div class="hero-character">
             学
           </div>
@@ -175,80 +220,183 @@
         </div>
 
 
-        <!-- Home statistics -->
+
+        <!-- HOME STATISTICS -->
 
         <div class="stats-grid">
 
           <div class="stat-card">
-            <span class="stat-icon">📚</span>
-            <strong id="home-total-words">0</strong>
-            <span>Total Words</span>
+
+            <span class="stat-icon">
+              📚
+            </span>
+
+            <strong id="home-total-words">
+              0
+            </strong>
+
+            <span>
+              Total Words
+            </span>
+
           </div>
 
-          <div class="stat-card">
-            <span class="stat-icon">⭐</span>
-            <strong id="home-mastered">0</strong>
-            <span>Mastered</span>
-          </div>
 
           <div class="stat-card">
-            <span class="stat-icon">🔄</span>
-            <strong id="home-review">0</strong>
-            <span>Need Review</span>
+
+            <span class="stat-icon">
+              ⭐
+            </span>
+
+            <strong id="home-mastered">
+              0
+            </strong>
+
+            <span>
+              Mastered
+            </span>
+
           </div>
 
+
           <div class="stat-card">
-            <span class="stat-icon">🎯</span>
-            <strong id="home-accuracy">0%</strong>
-            <span>Accuracy</span>
+
+            <span class="stat-icon">
+              🔄
+            </span>
+
+            <strong id="home-review">
+              0
+            </strong>
+
+            <span>
+              Need Review
+            </span>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <span class="stat-icon">
+              🎯
+            </span>
+
+            <strong id="home-accuracy">
+              0%
+            </strong>
+
+            <span>
+              Accuracy
+            </span>
+
           </div>
 
         </div>
 
 
-        <!-- Quick actions -->
+
+        <!-- QUICK ACTIONS -->
 
         <div class="section-heading">
-          <h3>Quick Study</h3>
+
+          <h3>
+            Quick Study
+          </h3>
+
         </div>
 
-        <div class="quick-actions">
+
+        <!-- <div class="quick-actions">
 
           <button
             class="action-card"
             data-go-view="flashcards"
-          >
-            <span>🃏</span>
-            <strong>Flashcards</strong>
-            <small>Review vocabulary</small>
+          > -->
+<!-- 
+            <span>
+              🃏
+            </span>
+
+            <strong>
+              Flashcards
+            </strong>
+
+            <small>
+              Review vocabulary
+            </small>
+
           </button>
+
 
           <button
             class="action-card"
             data-go-view="reading"
           >
-            <span>📖</span>
-            <strong>Reading</strong>
-            <small>Practice example sentences</small>
+
+            <span>
+              📖
+            </span>
+
+            <strong>
+              Reading
+            </strong>
+
+            <small>
+              Practice example sentences
+            </small>
+
+          </button> -->
+
+
+          <!-- <button
+            class="action-card"
+            data-go-view="class-reading"
+          >
+
+            <span>
+              📚
+            </span>
+
+            <strong>
+              Class Reading
+            </strong>
+
+            <small>
+              Practice textbook sentences
+            </small>
+
           </button>
+
 
           <button
             class="action-card"
             data-go-view="games"
           >
-            <span>🎮</span>
-            <strong>Games</strong>
-            <small>Practice while playing</small>
+
+            <span>
+              🎮
+            </span>
+
+            <strong>
+              Games
+            </strong>
+
+            <small>
+              Practice while playing
+            </small>
+
           </button>
 
-        </div>
+        </div> -->
 
       </section>
 
 
-      <!-- ========================================= -->
+
+      <!-- ======================================================= -->
       <!-- FLASHCARDS -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
 
       <section
         id="view-flashcards"
@@ -258,14 +406,21 @@
         <div class="page-heading">
 
           <div>
-            <span class="eyebrow">VOCABULARY</span>
 
-            <h2>Flashcards</h2>
+            <span class="eyebrow">
+              VOCABULARY
+            </span>
+
+            <h2>
+              Flashcards
+            </h2>
 
             <p>
               Build a study set and review your vocabulary.
             </p>
+
           </div>
+
 
           <button
             id="flashcard-speak"
@@ -278,9 +433,11 @@
         </div>
 
 
-        <!-- Filters -->
+
+        <!-- FLASHCARD FILTERS -->
 
         <div class="filter-panel">
+
 
           <div class="filter-group">
 
@@ -289,10 +446,15 @@
             </label>
 
             <select id="lesson-filter">
-              <option value="">All Lessons</option>
+
+              <option value="">
+                All Lessons
+              </option>
+
             </select>
 
           </div>
+
 
 
           <div class="filter-group">
@@ -302,10 +464,15 @@
             </label>
 
             <select id="topic-filter">
-              <option value="">All Topics</option>
+
+              <option value="">
+                All Topics
+              </option>
+
             </select>
 
           </div>
+
 
 
           <div class="filter-group">
@@ -315,10 +482,15 @@
             </label>
 
             <select id="hsk-filter">
-              <option value="">All HSK Levels</option>
+
+              <option value="">
+                All HSK Levels
+              </option>
+
             </select>
 
           </div>
+
 
 
           <div class="filter-group">
@@ -328,13 +500,27 @@
             </label>
 
             <select id="study-size">
-              <option value="all" selected>All</option>
-              <option value="20">20 words</option>
-              <option value="50">50 words</option>
-              <option value="100">100 words</option>
+
+              <option value="all" selected>
+                All
+              </option>
+
+              <option value="20">
+                20 words
+              </option>
+
+              <option value="50">
+                50 words
+              </option>
+
+              <option value="100">
+                100 words
+              </option>
+
             </select>
 
           </div>
+
 
 
           <button
@@ -347,7 +533,8 @@
         </div>
 
 
-        <!-- Flashcard -->
+
+        <!-- FLASHCARD -->
 
         <div class="flashcard-area">
 
@@ -358,13 +545,17 @@
 
             <div class="flashcard-inner">
 
+
               <!-- FRONT -->
 
-              <div class="flashcard-face flashcard-front">
+              <div
+                class="flashcard-face flashcard-front"
+              >
 
                 <span class="card-label">
                   Chinese
                 </span>
+
 
                 <div
                   id="flashcard-simplified"
@@ -373,12 +564,14 @@
                   —
                 </div>
 
+
                 <div
                   id="flashcard-progress"
                   class="card-progress"
                 >
                   0 / 0
                 </div>
+
 
                 <div class="flip-hint">
                   Click the card to reveal
@@ -387,15 +580,19 @@
               </div>
 
 
+
               <!-- BACK -->
 
-              <div class="flashcard-face flashcard-back">
+              <div
+                class="flashcard-face flashcard-back"
+              >
 
                 <div class="back-header">
 
                   <span class="card-label">
                     Vocabulary
                   </span>
+
 
                   <button
                     id="back-speak"
@@ -407,11 +604,11 @@
 
                 </div>
 
+
                 <div
                   id="flashcard-details"
                   class="flashcard-details"
-                >
-                </div>
+                ></div>
 
               </div>
 
@@ -420,7 +617,8 @@
           </div>
 
 
-          <!-- Flashcard controls -->
+
+          <!-- FLASHCARD CONTROLS -->
 
           <div class="flashcard-controls">
 
@@ -431,12 +629,14 @@
               ← Previous
             </button>
 
+
             <button
               id="shuffle-card"
               class="secondary-button"
             >
               🔀 Shuffle
             </button>
+
 
             <button
               id="next-card"
@@ -452,9 +652,10 @@
       </section>
 
 
-      <!-- ========================================= -->
+
+      <!-- ======================================================= -->
       <!-- READING -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
 
       <section
         id="view-reading"
@@ -464,23 +665,30 @@
         <div class="page-heading">
 
           <div>
-            <span class="eyebrow">阅读</span>
 
-            <h2>Reading Practice</h2>
+            <span class="eyebrow">
+              阅读
+            </span>
+
+            <h2>
+              Reading Practice
+            </h2>
 
             <p>
               Hover over characters for vocabulary information.
               Click a character to see more details.
             </p>
+
           </div>
 
         </div>
 
 
+
         <div class="reading-layout">
 
 
-          <!-- Reading card -->
+          <!-- READING CARD -->
 
           <div class="reading-card">
 
@@ -489,6 +697,7 @@
               <span id="reading-example-label">
                 Example 1
               </span>
+
 
               <button
                 id="reading-speak"
@@ -501,12 +710,14 @@
             </div>
 
 
+
             <div
               id="reading-sentence"
               class="reading-sentence"
             >
               Loading...
             </div>
+
 
 
             <button
@@ -517,23 +728,38 @@
             </button>
 
 
+
             <div
               id="example-details"
               class="example-details hidden"
             >
 
               <div class="example-pinyin">
-                <strong>Pinyin</strong>
+
+                <strong>
+                  Pinyin
+                </strong>
+
                 <p id="example-pinyin-text"></p>
+
               </div>
 
+
               <div class="example-english">
-                <strong>English</strong>
+
+                <strong>
+                  English
+                </strong>
+
                 <p id="example-english-text"></p>
+
               </div>
 
             </div>
 
+
+
+            <!-- READING NAVIGATION -->
 
             <div class="reading-navigation">
 
@@ -544,12 +770,14 @@
                 ← Previous
               </button>
 
+
               <button
                 id="random-reading"
                 class="secondary-button"
               >
                 🔀 Random
               </button>
+
 
               <button
                 id="next-reading"
@@ -563,7 +791,8 @@
           </div>
 
 
-          <!-- Character information -->
+
+          <!-- CHARACTER INFORMATION -->
 
           <aside
             id="character-details"
@@ -576,7 +805,9 @@
                 字
               </div>
 
-              <h3>Character Information</h3>
+              <h3>
+                Character Information
+              </h3>
 
               <p>
                 Hover over or click a Chinese character
@@ -592,9 +823,243 @@
       </section>
 
 
-      <!-- ========================================= -->
+
+      <!-- ======================================================= -->
+      <!-- CLASS READING -->
+      <!-- ======================================================= -->
+
+      <section
+        id="view-class-reading"
+        class="view"
+      >
+
+
+        <!-- PAGE HEADING -->
+
+        <div class="page-heading">
+
+          <div>
+
+            <span class="eyebrow">
+              课堂阅读
+            </span>
+
+            <h2>
+              Class Reading
+            </h2>
+
+            <p>
+              Practice sentences from the Chinese Link
+              textbook. Hover over or click vocabulary words
+              to see their definitions and pronunciation.
+            </p>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- LESSON FILTER -->
+
+        <div
+          class="filter-panel class-reading-filter-panel"
+        >
+
+          <div class="filter-group">
+
+            <label
+              for="class-reading-lesson-filter"
+            >
+              Lesson
+            </label>
+
+
+            <select
+              id="class-reading-lesson-filter"
+            >
+
+              <option value="all">
+                All Lessons
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- CLASS READING CARD -->
+
+        <div class="class-reading-card">
+
+
+          <!-- LESSON / TOPIC -->
+
+          <div
+            id="class-reading-lesson-topic"
+            class="class-reading-lesson-topic"
+          >
+            Lesson
+          </div>
+
+
+
+          <!-- CHINESE SENTENCE -->
+
+          <div class="class-reading-audio-row">
+
+            <button
+              id="class-reading-speak"
+              class="icon-button class-reading-speak"
+              type="button"
+              title="Read sentence aloud"
+              aria-label="Read sentence aloud"
+            >
+              🔊
+            </button>
+
+          </div>
+
+          <div
+            id="class-reading-sentence"
+            class="class-reading-sentence"
+          >
+            Loading Class Reading...
+          </div>
+
+
+
+          <!-- VOCABULARY INFORMATION -->
+
+          <div
+            id="class-reading-word-details"
+            class="class-reading-word-details"
+          >
+
+            <div
+              class="class-reading-word-placeholder"
+            >
+              Hover over or click a vocabulary word
+              to see its information.
+            </div>
+
+          </div>
+
+
+
+          <!-- SHOW PINYIN / ENGLISH -->
+
+          <button
+            id="show-class-reading-details"
+            class="secondary-button"
+          >
+            Show Pinyin &amp; English
+          </button>
+
+
+
+          <!-- SENTENCE DETAILS -->
+
+          <div
+            id="class-reading-details"
+            class="class-reading-details"
+            hidden
+          >
+
+
+            <div
+              class="class-reading-pinyin-label"
+            >
+              Pinyin
+            </div>
+
+
+            <div
+              id="class-reading-pinyin"
+              class="class-reading-pinyin"
+            ></div>
+
+
+
+            <div
+              class="class-reading-english-label"
+            >
+              English
+            </div>
+
+
+            <div
+              id="class-reading-english"
+              class="class-reading-english"
+            ></div>
+
+          </div>
+
+
+
+          <!-- SOURCE -->
+
+          <div
+            id="class-reading-source"
+            class="class-reading-source"
+          ></div>
+
+
+
+          <!-- SENTENCE COUNTER -->
+
+          <div
+            id="class-reading-counter"
+            class="class-reading-counter"
+          >
+            0 sentences
+          </div>
+
+
+
+          <!-- CLASS READING NAVIGATION -->
+
+          <div
+            class="class-reading-navigation"
+          >
+
+            <button
+              id="previous-class-reading"
+              class="secondary-button"
+            >
+              ← Previous
+            </button>
+
+
+            <button
+              id="random-class-reading"
+              class="secondary-button"
+            >
+              🔀 Random
+            </button>
+
+
+            <button
+              id="next-class-reading"
+              class="primary-button"
+            >
+              Next →
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- ======================================================= -->
       <!-- GAMES -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
 
       <section
         id="view-games"
@@ -604,9 +1069,14 @@
         <div class="page-heading">
 
           <div>
-            <span class="eyebrow">练习</span>
 
-            <h2>Mini-Games</h2>
+            <span class="eyebrow">
+              练习
+            </span>
+
+            <h2>
+              Mini-Games
+            </h2>
 
             <p>
               Practice vocabulary in different ways.
@@ -617,100 +1087,144 @@
         </div>
 
 
-        <!-- Game selection -->
+
+        <!-- GAME SELECTION -->
 
         <div
           id="game-selection"
           class="game-selection"
         >
 
+
           <button
             class="game-card"
             data-game="multiple-choice"
           >
-            <span class="game-icon">🎯</span>
 
-            <strong>Multiple Choice</strong>
+            <span class="game-icon">
+              🎯
+            </span>
+
+            <strong>
+              Multiple Choice
+            </strong>
 
             <small>
               Chinese → English
             </small>
+
           </button>
+
 
 
           <button
             class="game-card"
             data-game="english-chinese"
           >
-            <span class="game-icon">🔄</span>
 
-            <strong>English → Chinese</strong>
+            <span class="game-icon">
+              🔄
+            </span>
+
+            <strong>
+              English → Chinese
+            </strong>
 
             <small>
               Choose the correct Chinese word
             </small>
+
           </button>
+
 
 
           <button
             class="game-card"
             data-game="scramble"
           >
-            <span class="game-icon">🧩</span>
 
-            <strong>Word Builder</strong>
+            <span class="game-icon">
+              🧩
+            </span>
+
+            <strong>
+              Word Builder
+            </strong>
 
             <small>
               Unscramble the Chinese word
             </small>
+
           </button>
+
 
 
           <button
             class="game-card"
             data-game="matching"
           >
-            <span class="game-icon">🃏</span>
 
-            <strong>Matching</strong>
+            <span class="game-icon">
+              🃏
+            </span>
+
+            <strong>
+              Matching
+            </strong>
 
             <small>
               Match Chinese and English
             </small>
+
           </button>
+
 
 
           <button
             class="game-card"
             data-game="sentence"
           >
-            <span class="game-icon">📖</span>
 
-            <strong>Sentence Scramble</strong>
+            <span class="game-icon">
+              📖
+            </span>
+
+            <strong>
+              Sentence Scramble
+            </strong>
 
             <small>
               Put a sentence in order
             </small>
+
           </button>
+
 
 
           <button
             class="game-card"
             data-game="listening"
           >
-            <span class="game-icon">🔊</span>
 
-            <strong>Listening</strong>
+            <span class="game-icon">
+              🔊
+            </span>
+
+            <strong>
+              Listening
+            </strong>
 
             <small>
               Listen and choose
             </small>
+
           </button>
 
         </div>
 
 
-        <!-- Game area -->
+
+        <!-- GAME AREA -->
 
         <div
           id="game-area"
@@ -726,9 +1240,14 @@
               ← Games
             </button>
 
+
             <div class="game-score">
+
               Score:
-              <strong id="game-score">0</strong>
+              <strong id="game-score">
+                0
+              </strong>
+
             </div>
 
           </div>
@@ -737,17 +1256,17 @@
           <div
             id="game-content"
             class="game-content"
-          >
-          </div>
+          ></div>
 
         </div>
 
       </section>
 
 
-      <!-- ========================================= -->
+
+      <!-- ======================================================= -->
       <!-- PROGRESS -->
-      <!-- ========================================= -->
+      <!-- ======================================================= -->
 
       <section
         id="view-progress"
@@ -757,9 +1276,14 @@
         <div class="page-heading">
 
           <div>
-            <span class="eyebrow">进步</span>
 
-            <h2>Your Progress</h2>
+            <span class="eyebrow">
+              进步
+            </span>
+
+            <h2>
+              Your Progress
+            </h2>
 
             <p>
               Track your vocabulary practice.
@@ -770,30 +1294,71 @@
         </div>
 
 
+
+        <!-- PROGRESS SUMMARY -->
+
         <div class="progress-summary">
 
-          <div class="progress-stat">
-            <strong id="progress-total">0</strong>
-            <span>Words Practiced</span>
-          </div>
 
           <div class="progress-stat">
-            <strong id="progress-mastered">0</strong>
-            <span>Mastered</span>
+
+            <strong id="progress-total">
+              0
+            </strong>
+
+            <span>
+              Words Practiced
+            </span>
+
           </div>
 
-          <div class="progress-stat">
-            <strong id="progress-review">0</strong>
-            <span>Needs Review</span>
-          </div>
+
 
           <div class="progress-stat">
-            <strong id="progress-accuracy">0%</strong>
-            <span>Accuracy</span>
+
+            <strong id="progress-mastered">
+              0
+            </strong>
+
+            <span>
+              Mastered
+            </span>
+
+          </div>
+
+
+
+          <div class="progress-stat">
+
+            <strong id="progress-review">
+              0
+            </strong>
+
+            <span>
+              Needs Review
+            </span>
+
+          </div>
+
+
+
+          <div class="progress-stat">
+
+            <strong id="progress-accuracy">
+              0%
+            </strong>
+
+            <span>
+              Accuracy
+            </span>
+
           </div>
 
         </div>
 
+
+
+        <!-- PROGRESS ACTIONS -->
 
         <div class="progress-actions">
 
@@ -803,6 +1368,7 @@
           >
             Review Incorrect Words
           </button>
+
 
           <button
             id="reset-progress"
@@ -814,31 +1380,38 @@
         </div>
 
 
+
         <div class="section-heading">
-          <h3>Vocabulary Progress</h3>
+
+          <h3>
+            Vocabulary Progress
+          </h3>
+
         </div>
+
 
 
         <div
           id="progress-list"
           class="progress-list"
-        >
-        </div>
+        ></div>
 
       </section>
 
     </main>
 
 
-    <!-- ========================================= -->
+
+    <!-- ========================================================= -->
     <!-- FOOTER -->
-    <!-- ========================================= -->
+    <!-- ========================================================= -->
 
     <footer class="app-footer">
 
       <span>
         Chinese Study App — Version 1
       </span>
+
 
       <span>
         Vocabulary powered by your Excel dataset
@@ -849,27 +1422,48 @@
   </div>
 
 
-  <!-- ========================================= -->
-  <!-- JAVASCRIPT -->
-  <!-- ========================================= -->
 
-  <!-- SheetJS: read Excel files directly in the browser -->
+  <!-- ========================================================= -->
+  <!-- JAVASCRIPT -->
+  <!-- ========================================================= -->
+
+  <!-- SheetJS: reads Excel files directly in the browser -->
+
   <script
     src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
   ></script>
 
+
   <!-- Main application -->
-  <script src="app.js"></script>
+
+  <script src="js/core.js"></script>
+  <script src="js/study.js"></script>
+  <script src="js/games.js"></script>
+  <script src="js/init.js"></script>
+
+
+
+  <!-- ========================================================= -->
+  <!-- NOSCRIPT -->
+  <!-- ========================================================= -->
 
   <noscript>
+
     <div class="message-panel error">
-      <h2>JavaScript is required</h2>
+
+      <h2>
+        JavaScript is required
+      </h2>
+
       <p>
-        Please enable JavaScript in your browser to use the
-        Chinese Study application.
+        Please enable JavaScript in your browser to use
+        the Chinese Study application.
       </p>
+
     </div>
+
   </noscript>
 
 </body>
+
 </html>

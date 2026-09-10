@@ -878,6 +878,9 @@ function renderScrambleGame() {
 /* ============================================================
    MATCHING GAME
 ============================================================ */
+/* ============================================================
+   MATCHING GAME
+============================================================ */
 
 function renderMatchingGame() {
 
@@ -902,11 +905,9 @@ function renderMatchingGame() {
   var english =
     shuffle(words);
 
-  state.matchingSelected =
-    null;
-
-  state.matchingMatches =
-    0;
+  state.matchingSelected = null;
+  state.matchingMatches = 0;
+  state.matchingTries = 0;
 
   container.innerHTML =
     '<div class="game-question">' +
@@ -965,10 +966,10 @@ function renderMatchingGame() {
 
       '</div>' +
 
-      '<div id="matching-score" ' +
-           'class="game-score">' +
+      '<div id="matching-score" class="game-score">' +
         "Matches: 0 / " +
         words.length +
+        " • Tries: 0 / 10" +
       '</div>' +
 
     '</div>';
@@ -986,9 +987,12 @@ function renderMatchingGame() {
             return;
           }
 
-          if (
-            !state.matchingSelected
-          ) {
+          /*
+             First click selects the first item.
+             It does NOT count as a try.
+          */
+
+          if (!state.matchingSelected) {
 
             state.matchingSelected =
               button;
@@ -1000,6 +1004,10 @@ function renderMatchingGame() {
             return;
           }
 
+          /*
+             Second click completes one try.
+          */
+
           var first =
             state.matchingSelected;
 
@@ -1010,10 +1018,20 @@ function renderMatchingGame() {
             return;
           }
 
+          /*
+             One try = two selected items.
+          */
+
+          state.matchingTries++;
+
           if (
             first.getAttribute("data-id") ===
             second.getAttribute("data-id")
           ) {
+
+            /*
+               CORRECT MATCH
+            */
 
             first.classList.add(
               "matched"
@@ -1027,11 +1045,10 @@ function renderMatchingGame() {
             second.disabled = true;
 
             state.matchingMatches++;
-
             state.gameScore++;
+            state.gameCorrect++;
 
-            state.matchingSelected =
-              null;
+            state.matchingSelected = null;
 
             var score =
               $("#matching-score");
@@ -1042,8 +1059,20 @@ function renderMatchingGame() {
                 "Matches: " +
                 state.matchingMatches +
                 " / " +
-                words.length;
+                words.length +
+                " • Tries: " +
+                state.matchingTries +
+                " / 10";
             }
+
+            /*
+               STOP CONDITION #1:
+               All five pairs have been matched.
+
+               This takes priority over the 10-try limit.
+               Therefore, if the fifth pair is completed
+               on try #10, the player gets the celebration.
+            */
 
             if (
               state.matchingMatches ===
@@ -1060,9 +1089,17 @@ function renderMatchingGame() {
                 finishGame,
                 600
               );
+
+              return;
             }
 
           } else {
+
+            /*
+               INCORRECT MATCH
+            */
+
+            state.gameWrong++;
 
             first.classList.add(
               "incorrect"
@@ -1071,6 +1108,26 @@ function renderMatchingGame() {
             second.classList.add(
               "incorrect"
             );
+
+            var score =
+              $("#matching-score");
+
+            if (score) {
+
+              score.textContent =
+                "Matches: " +
+                state.matchingMatches +
+                " / " +
+                words.length +
+                " • Tries: " +
+                state.matchingTries +
+                " / 10";
+            }
+
+            /*
+               Give the player a moment to see
+               the incorrect pair.
+            */
 
             setTimeout(
               function() {
@@ -1088,15 +1145,83 @@ function renderMatchingGame() {
               500
             );
 
-            state.matchingSelected =
-              null;
+            state.matchingSelected = null;
+
+            /*
+               STOP CONDITION #2:
+               Ten tries have been used before
+               all five pairs were matched.
+
+               Show "Try Again" instead of
+               the celebration.
+            */
+
+            if (
+              state.matchingMatches < words.length &&
+              state.matchingTries >= 10
+            ) {
+
+              setTimeout(
+                finishMatchingTryAgain,
+                550
+              );
+
+              return;
+            }
           }
         };
     }
   );
 }
 
+function finishMatchingTryAgain() {
 
+  var container =
+    $("#game-content");
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML =
+    '<div class="game-finished">' +
+
+      '<h3>💪 Try Again!</h3>' +
+
+      '<p>' +
+        'You used all 10 tries.' +
+      '</p>' +
+
+      '<p class="game-final-score">' +
+        'You matched ' +
+        state.matchingMatches +
+        ' / 5 pairs.' +
+      '</p>' +
+
+      '<p>' +
+        'Keep practicing and try again!' +
+      '</p>' +
+
+      '<button id="restart-game" ' +
+              'class="button primary">' +
+        'Try Again' +
+      '</button>' +
+
+    '</div>';
+
+  var restart =
+    $("#restart-game");
+
+  if (restart) {
+
+    restart.onclick =
+      function() {
+
+        startGame("matching");
+
+      };
+  }
+}
 /* ============================================================
    SENTENCE GAME
 ============================================================ */

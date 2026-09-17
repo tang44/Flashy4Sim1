@@ -160,6 +160,53 @@ button:disabled {
 
 
 /* =========================================
+   SPEECH VOICE CONTROL
+========================================= */
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.speech-voice-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.speech-voice-control label {
+  color: var(--text-light);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.speech-voice-control select {
+  min-width: 230px;
+  max-width: 320px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 9px;
+}
+
+@media (max-width: 800px) {
+  .header-status {
+    justify-content: flex-start;
+  }
+
+  .speech-voice-control select {
+    min-width: 180px;
+    max-width: 240px;
+  }
+}
+
+
+/* =========================================
    NAVIGATION
 ========================================= */
 

@@ -248,6 +248,9 @@ async function initializeApp() {
 
   setupNavigation();
 
+  /* Initialize browser Chinese speech voices independently of workbook loading. */
+  setupSpeechVoiceSelector();
+
   setupFlashcardButtons();
 
   setupStudySetControls();

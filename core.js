@@ -1200,15 +1200,254 @@ function updateFilteredCount() {
 
 
 /* ============================================================
-   SPEECH (SHARED)
+   SPEECH / VOICE SELECTION
 ============================================================ */
 
-/* ============================================================
-   SPEECH
-============================================================ */
+/*
+   Browser speech synthesis is asynchronous on Chromium-based browsers.
+   getVoices() may return [] during the first page-load pass, so the app
+   listens for voiceschanged and also refreshes after short delays.
+*/
+
+const SPEECH_VOICE_STORAGE_KEY = "chineseStudySpeechVoice";
+
+var speechVoices = [];
+var selectedSpeechVoiceName = "";
+var speechVoicesChangeHandlerAttached = false;
+
+function isChineseVoice(voice) {
+  if (!voice) {
+    return false;
+  }
+
+  var lang = clean(voice.lang).toLowerCase();
+
+  /*
+     Normal browser values are zh-CN / zh-TW / zh-HK, but some engines
+     expose Mandarin as cmn. Accept both so we do not hide valid voices.
+  */
+  return /^zh(?:-|_|$)/i.test(lang) || /^cmn(?:-|_|$)/i.test(lang);
+}
+
+function isMainlandChineseVoice(voice) {
+  if (!voice) {
+    return false;
+  }
+
+  var lang = clean(voice.lang).toLowerCase();
+  return lang === "zh-cn" || lang === "zh_cn" || lang === "cmn-cn";
+}
+
+function isGoogleZhCNVoice(voice) {
+  if (!voice) {
+    return false;
+  }
+
+  var name = clean(voice.name).toLowerCase();
+  return isMainlandChineseVoice(voice) && name.indexOf("google") !== -1;
+}
+
+function getSpeechVoices() {
+  if (
+    typeof window === "undefined" ||
+    !window.speechSynthesis ||
+    typeof window.speechSynthesis.getVoices !== "function"
+  ) {
+    return [];
+  }
+
+  return window.speechSynthesis.getVoices() || [];
+}
+
+function refreshSpeechVoices() {
+  speechVoices = sortSpeechVoices(getSpeechVoices());
+  return speechVoices;
+}
+
+function chooseDefaultSpeechVoice(voices) {
+  var chineseVoices = (voices || []).filter(isChineseVoice);
+
+  if (!chineseVoices.length) {
+    return null;
+  }
+
+  /* Prefer Google Mandarin when present. */
+  var googleZhCN = chineseVoices.find(isGoogleZhCNVoice);
+  if (googleZhCN) {
+    return googleZhCN;
+  }
+
+  /* Then prefer any mainland Chinese voice. */
+  var zhCN = chineseVoices.find(isMainlandChineseVoice);
+  if (zhCN) {
+    return zhCN;
+  }
+
+  /* Finally use another Chinese/Mandarin voice. */
+  return chineseVoices[0];
+}
+
+function sortSpeechVoices(voices) {
+  return (voices || [])
+    .filter(isChineseVoice)
+    .slice()
+    .sort(function(a, b) {
+      var aGoogle = isGoogleZhCNVoice(a) ? 0 : 1;
+      var bGoogle = isGoogleZhCNVoice(b) ? 0 : 1;
+
+      if (aGoogle !== bGoogle) {
+        return aGoogle - bGoogle;
+      }
+
+      var aMainland = isMainlandChineseVoice(a) ? 0 : 1;
+      var bMainland = isMainlandChineseVoice(b) ? 0 : 1;
+
+      if (aMainland !== bMainland) {
+        return aMainland - bMainland;
+      }
+
+      var langCompare = clean(a.lang).localeCompare(clean(b.lang));
+      if (langCompare !== 0) {
+        return langCompare;
+      }
+
+      return clean(a.name).localeCompare(clean(b.name));
+    });
+}
+
+function populateSpeechVoiceSelector() {
+  var selector = document.querySelector("#speech-voice");
+  if (!selector) {
+    return;
+  }
+
+  refreshSpeechVoices();
+
+  var savedVoiceName = "";
+  try {
+    savedVoiceName = localStorage.getItem(SPEECH_VOICE_STORAGE_KEY) || "";
+  } catch (error) {
+    console.warn("Could not read saved speech voice:", error);
+  }
+
+  var defaultVoice = speechVoices.find(function(voice) {
+    return voice.name === savedVoiceName;
+  });
+
+  if (!defaultVoice) {
+    defaultVoice = chooseDefaultSpeechVoice(speechVoices);
+  }
+
+  selectedSpeechVoiceName = defaultVoice ? defaultVoice.name : "";
+  selector.innerHTML = "";
+
+  if (!speechVoices.length) {
+    var unavailableOption = document.createElement("option");
+    unavailableOption.value = "";
+    unavailableOption.textContent = "Waiting for Chinese voices…";
+    selector.appendChild(unavailableOption);
+    selector.disabled = true;
+    return;
+  }
+
+  selector.disabled = false;
+
+  speechVoices.forEach(function(voice) {
+    var option = document.createElement("option");
+    option.value = voice.name;
+
+    var label = clean(voice.name) + " (" + clean(voice.lang) + ")";
+    if (isGoogleZhCNVoice(voice)) {
+      label += " — DEFAULT";
+    }
+
+    option.textContent = label;
+    selector.appendChild(option);
+  });
+
+  if (selectedSpeechVoiceName) {
+    selector.value = selectedSpeechVoiceName;
+  }
+}
+
+function getSelectedSpeechVoice() {
+  var currentVoices = refreshSpeechVoices();
+  var selector = document.querySelector("#speech-voice");
+  var requestedName = selector && selector.value
+    ? selector.value
+    : selectedSpeechVoiceName;
+
+  if (requestedName) {
+    var selected = currentVoices.find(function(voice) {
+      return voice.name === requestedName;
+    });
+
+    if (selected) {
+      return selected;
+    }
+  }
+
+  return chooseDefaultSpeechVoice(currentVoices);
+}
+
+function setSpeechVoice(voiceName) {
+  refreshSpeechVoices();
+
+  var voice = speechVoices.find(function(item) {
+    return item.name === voiceName;
+  });
+
+  if (!voice) {
+    return false;
+  }
+
+  selectedSpeechVoiceName = voice.name;
+
+  try {
+    localStorage.setItem(SPEECH_VOICE_STORAGE_KEY, voice.name);
+  } catch (error) {
+    console.warn("Could not save speech voice:", error);
+  }
+
+  return true;
+}
+
+function setupSpeechVoiceSelector() {
+  var selector = document.querySelector("#speech-voice");
+  if (!selector) {
+    return;
+  }
+
+  selector.onchange = function() {
+    if (setSpeechVoice(selector.value)) {
+      speakChinese("你好");
+    }
+  };
+
+  populateSpeechVoiceSelector();
+
+  if (
+    typeof window !== "undefined" &&
+    window.speechSynthesis &&
+    !speechVoicesChangeHandlerAttached
+  ) {
+    window.speechSynthesis.addEventListener(
+      "voiceschanged",
+      function() {
+        populateSpeechVoiceSelector();
+      }
+    );
+
+    speechVoicesChangeHandlerAttached = true;
+  }
+
+  /* Chromium may populate the list shortly after DOMContentLoaded. */
+  [100, 300, 750, 1500].forEach(function(delay) {
+    setTimeout(populateSpeechVoiceSelector, delay);
+  });
+}
 
 function speakChinese(text) {
-
   text = clean(text);
 
   if (!text) {
@@ -1217,7 +1456,7 @@ function speakChinese(text) {
 
   if (
     typeof window === "undefined" ||
-    typeof window.speechSynthesis === "undefined" ||
+    !window.speechSynthesis ||
     typeof window.SpeechSynthesisUtterance === "undefined"
   ) {
     console.warn("Speech synthesis is not supported by this browser.");
@@ -1225,31 +1464,71 @@ function speakChinese(text) {
   }
 
   var synthesis = window.speechSynthesis;
+  var selectedVoice = getSelectedSpeechVoice();
+
+  /*
+     If Chromium has not exposed its voices yet, wait briefly for them.
+     This fixes the common first-click/first-load failure where getVoices()
+     is temporarily empty.
+  */
+  if (!selectedVoice && !getSpeechVoices().length) {
+    var startedAt = Date.now();
+
+    var retrySpeech = function() {
+      var retryVoice = getSelectedSpeechVoice();
+
+      if (retryVoice || Date.now() - startedAt >= 1500) {
+        if (retryVoice) {
+          speakChineseNow(text, retryVoice);
+        } else {
+          console.warn("No Chinese speech voice is available in this browser.");
+        }
+        return;
+      }
+
+      setTimeout(retrySpeech, 100);
+    };
+
+    retrySpeech();
+    return true;
+  }
+
+  return speakChineseNow(text, selectedVoice);
+}
+
+function speakChineseNow(text, selectedVoice) {
+  var synthesis = window.speechSynthesis;
 
   synthesis.cancel();
 
-  var utterance =
-    new window.SpeechSynthesisUtterance(text);
+  var utterance = new window.SpeechSynthesisUtterance(text);
 
-  utterance.lang = "zh-CN";
+  utterance.lang = selectedVoice
+    ? selectedVoice.lang
+    : "zh-CN";
   utterance.rate = 0.8;
   utterance.pitch = 1;
   utterance.volume = 1;
 
-  var voices = synthesis.getVoices();
-  var chineseVoice = voices.find(function(voice) {
-    return /^zh(?:-|$)/i.test(voice.lang);
-  });
-
-  if (chineseVoice) {
-    utterance.voice = chineseVoice;
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
   }
+
+  utterance.onerror = function(event) {
+    console.warn("Chinese speech error:", event.error || event);
+  };
 
   synthesis.speak(utterance);
 
+  /* Work around Chromium's occasional paused speech queue. */
   if (typeof synthesis.resume === "function") {
     synthesis.resume();
   }
 
   return true;
 }
+
+
+/* ============================================================
+   END OF SPEECH SECTION
+============================================================ */
